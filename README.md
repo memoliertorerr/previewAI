@@ -9,7 +9,7 @@ third-party dependencies, about 1.6 MB. Bring your own model:
 | Provider | What you need | Where documents go |
 |---|---|---|
 | **Apple Intelligence** | macOS 26 with Apple Intelligence turned on | Stays on your Mac |
-| **Claude (Anthropic API)** | An API key from console.anthropic.com | Anthropic |
+| **Claude (Anthropic API)** | An API key from platform.claude.com | Anthropic |
 | **OpenAI-compatible** | An OpenAI key — or any compatible server (OpenRouter, Groq, …) | That service |
 | **Ollama / LM Studio** | The app running locally with a model pulled | Stays on your Mac |
 | **Claude Code CLI** | Claude Code (`claude`) installed and signed in with your own account | Anthropic |
