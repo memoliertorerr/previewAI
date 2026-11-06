@@ -45,7 +45,7 @@
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ✅ done |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ✅ done |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
-| PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ⬜ todo |
+| PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
@@ -846,6 +846,26 @@ the override path, then `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
 the child process.
 **Commit:** `pa-step-10: claude code and codex subscription providers via cli`
 
+**Implementation notes (2026-11-06):**
+
+- **Extra Claude flags beyond the Design Decision:** `--setting-sources project` (with cwd `/`
+  there are no project settings, so none of the user's hooks, plugins, or settings load —
+  `claude --help` lists only `user`, `project`, `local` as sources) and `--effort low` for speed.
+  Still never `--bare` (it ignores the subscription login).
+- **Extra Codex flag:** `-c model_reasoning_effort="low"` for speed. Codex has no system-prompt
+  flag, so the system text leads the stdin prompt with "do not run commands or read files".
+  Codex output arrives as one `agent_message` at the end (no token streaming).
+- **Process I/O runs on dedicated threads** (stdin writer, stderr collector, stdout line reader)
+  so blocking reads never sit on Swift's cooperative pool and a large document can't deadlock the
+  pipes. Cancel → `terminate()`; a test asserts the fake child's PID is gone.
+- **A bad override path doesn't fall back** to another binary — it reports "not installed".
+- **Fake CLIs** live at `Tests/PreviewAICoreTests/Fixtures/bin/{claude,codex}` (executable bash
+  scripts) and log argv/stdin into `.build/test-scratch`.
+- **Not verified by the session that built it:** real `claude` / `codex` runs (they use the
+  owner's subscription and write to `~/.claude` / `~/.codex`). In particular, that
+  `--setting-sources project` and `--effort low` are accepted with a subscription login, and the
+  exact `codex exec --json` event names, are owner checks.
+
 ```text
 1. Core: Providers/CLIRunner.swift (#if !APPSTORE) — Process with stdin/stdout/stderr pipes,
    line-buffered stdout as AsyncThrowingStream, termination on Task cancellation, cwd "/",
@@ -994,6 +1014,13 @@ CI is green, then stop.
   works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
   new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
   again (ad-hoc signature changes — see Landmines).
+- [ ] **PA8–PA10 (providers)** — until the PA11 settings window lands, these can only be
+  exercised once Settings exists; then for each provider you use: Anthropic key → summary streams
+  from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →
+  summary, and with the server stopped → "Couldn't reach Ollama at localhost:11434 — is it
+  running?"; Claude subscription → `claude -p` produces a summary (confirms the CLI accepts
+  `--setting-sources project --effort low` with a subscription login); Codex subscription →
+  `codex exec` produces a summary.
 
 ---
 

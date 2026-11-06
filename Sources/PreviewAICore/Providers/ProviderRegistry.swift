@@ -30,8 +30,15 @@ public final class ProviderRegistry {
             AnthropicProvider(apiKey: settings.apiKey(for: .anthropic), model: settings.anthropic.model)
         case .openAICompatible:
             OpenAICompatibleProvider(config: settings.openAICompatible, apiKey: settings.apiKey(for: .openAICompatible))
-        default:
-            UnavailableProvider(id: id, reason: "\(id.displayName) isn't set up yet.")
+        #if APPSTORE
+        case .claudeCode, .codex:
+            UnavailableProvider(id: id, reason: "\(id.displayName) isn't available in the App Store version of PreviewAI.")
+        #else
+        case .claudeCode:
+            ClaudeCodeProvider(config: settings.claudeCode)
+        case .codex:
+            CodexProvider(config: settings.codex)
+        #endif
         }
     }
 }
