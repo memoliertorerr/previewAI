@@ -49,6 +49,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `SummaryPanelController`, `SummaryView`, `PanelModel` | `App/SummaryPanel/` | Borderless, non-activating floating `NSPanel` (Liquid Glass on macOS 26) hosting SwiftUI. Esc/×/shortcut close it; closing calls `session.close()`. |
 | `AppleIntelligenceProvider` | `Core/Providers/` | FoundationModels (`#if canImport`, macOS 26+). Budget derived from `contextSize`; snapshots → deltas via `DeltaTracker`. |
 | `ProviderRegistry`, `UnavailableProvider` | `Core/Providers/` | Builds the selected provider; unconfigured ones explain themselves. |
+| `SettingsStore` | `Core/Settings/` | `@Observable` settings persisted as JSON in a `KeyValueStore` (UserDefaults in the app, in-memory in tests). API keys only via `SecretStore` (Keychain), per provider / per OpenAI-compatible preset. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants

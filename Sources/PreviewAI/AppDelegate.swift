@@ -8,7 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkey = HotkeyManager()
     private let services = ServiceProvider()
     private let session = SummarySession()
-    private let registry = ProviderRegistry()
+    private let settings = SettingsStore(store: UserDefaultsStore(), secrets: KeychainSecretStore())
+    private lazy var registry = ProviderRegistry(settings: settings)
     private lazy var panelModel = PanelModel(session: session)
     private lazy var panel = SummaryPanelController(model: panelModel)
     /// Menu line for problems that shouldn't pop up the panel (e.g. the shortcut is taken).
@@ -18,7 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = makeStatusItem()
 
         hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
-        let combo = KeyCombo.default
+        panelModel.length = settings.length
+        panelModel.onLengthChange = { [weak self] length in self?.settings.length = length }
+
+        let combo = settings.shortcut
         if HotkeyManager.isReservedBySystem(combo) {
             showInMenu("\(combo.displayString) is also a macOS shortcut — change one of them")
         }
@@ -64,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #else
         switch FinderSelection.current() {
         case .files(let urls): handle(files: urls)
-        case .notFinder, .empty: showInPanel("Select a document in Finder, then press \(KeyCombo.default.displayString).")
+        case .notFinder, .empty: showInPanel("Select a document in Finder, then press \(settings.shortcut.displayString).")
         case .permissionDenied: showInPanel("PreviewAI needs permission to see Finder's selection. Allow it in System Settings → Privacy & Security → Automation → PreviewAI → Finder.")
         case .failed(let message): showInPanel(message)
         }
@@ -138,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        let combo = KeyCombo.default
+        let combo = settings.shortcut
         let summarize = NSMenuItem(title: "Summarize Selection", action: #selector(summarizeSelection), keyEquivalent: "")
         summarize.target = self
         summarize.toolTip = "Shortcut: \(combo.displayString)"

@@ -42,7 +42,7 @@
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ✅ done |
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ✅ done |
 | PA6.1 | Review fixes before merging phase 2 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
-| PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
+| PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ✅ done |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ⬜ todo |
@@ -710,6 +710,18 @@ asserts no stored UserDefaults value contains the key string; (d) `ProviderRegis
 selected provider from settings.
 **Commit:** `pa-step-7: settings store, keychain secret store, provider configuration`
 
+**Implementation notes (2026-11-06):**
+
+- **Settings persist as JSON blobs** under `settings.<name>` keys (one per setting) — simpler than
+  typed accessors and Codable-checked.
+- **Bug caught by tests:** with `@Observable`, assignments inside `init` go through the observed
+  setter and fire `didSet`, so loading wrote every default back. An `isLoading` guard fixes it.
+- **OpenAI-compatible keys are per preset** (`openAICompatible.<preset>` Keychain account) so an
+  OpenAI key is never sent to a custom or local endpoint.
+- `OpenAICompatiblePreset` and the config structs live in `Core/Settings/ProviderConfigs.swift`;
+  PA9 builds on them. `ProviderRegistry.availableIDs` hides CLI providers in the APPSTORE build.
+- The panel's length switch now also updates the saved default length.
+
 ```text
 1. Core: Settings/KeyValueStore.swift — protocol (data/string/bool get-set) with
    UserDefaultsStore (app) and InMemoryKeyValueStore (tests).
@@ -983,6 +995,8 @@ Populated from real friction, not speculation:
 - **Swift `URL` can't hold a file-reference URL**: `URL(string: "file:///.file/id=…")` becomes
   `com-apple-unresolvable-file-reference-url:`, and bridging from `NSURL` resolves it. Resolve
   while still `NSURL` (PA6.1).
+- **`@Observable` fires `didSet` during `init`.** Unlike plain classes, observed properties
+  assigned in `init` run their observers — guard persistence while loading (PA7).
 - **Ad-hoc signatures change on every rebuild.** macOS keys Automation (TCC) grants and Keychain
   item access to the code signature, so after a rebuild expect the Finder permission prompt and
   a Keychain "allow" prompt again. Fixed properly by Developer ID signing (Later).

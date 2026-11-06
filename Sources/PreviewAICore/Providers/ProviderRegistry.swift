@@ -1,20 +1,33 @@
 import Foundation
 
-/// Builds the provider the user selected. Settings-driven from PA7 on.
+/// Builds the provider the user selected, from current settings.
 @MainActor
 public final class ProviderRegistry {
-    public var selected: ProviderID
+    public let settings: SettingsStore
 
-    public init(selected: ProviderID = .appleIntelligence) {
-        self.selected = selected
+    public init(settings: SettingsStore) {
+        self.settings = settings
+    }
+
+    /// Providers offered in this build (CLI ones are compiled out of the App Store build).
+    public static var availableIDs: [ProviderID] {
+        #if APPSTORE
+        [.appleIntelligence, .anthropic, .openAICompatible]
+        #else
+        ProviderID.allCases
+        #endif
     }
 
     public var current: any SummaryProvider {
-        switch selected {
+        provider(for: settings.selectedProvider)
+    }
+
+    public func provider(for id: ProviderID) -> any SummaryProvider {
+        switch id {
         case .appleIntelligence:
             AppleIntelligenceProvider()
         default:
-            UnavailableProvider(id: selected, reason: "\(selected.displayName) isn't set up yet.")
+            UnavailableProvider(id: id, reason: "\(id.displayName) isn't set up yet.")
         }
     }
 }

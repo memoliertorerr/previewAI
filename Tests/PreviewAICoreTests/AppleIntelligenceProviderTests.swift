@@ -46,14 +46,25 @@ import Testing
 @MainActor
 @Suite struct ProviderRegistryTests {
     @Test func defaultsToAppleIntelligence() {
-        #expect(ProviderRegistry().current.id == .appleIntelligence)
+        let settings = SettingsStore(store: InMemoryKeyValueStore(), secrets: InMemorySecretStore())
+        #expect(ProviderRegistry(settings: settings).current.id == .appleIntelligence)
     }
 
-    @Test func unconfiguredProvidersExplainThemselves() async {
-        let registry = ProviderRegistry(selected: .anthropic)
-        let provider = registry.current
-        #expect(provider.id == .anthropic)
-        #expect(await provider.availability() == .unavailable("Anthropic API isn't set up yet."))
+    @Test func unavailableProviderExplainsItself() async {
+        let provider = UnavailableProvider(id: .codex, reason: "Codex isn't installed.")
+        #expect(await provider.availability() == .unavailable("Codex isn't installed."))
+        var failed = false
+        do { for try await _ in provider.stream(SummaryRequest(system: "", user: "", maxOutputTokens: 1)) {} } catch { failed = true }
+        #expect(failed)
+    }
+
+    @Test func registryFollowsSettings() {
+        let settings = SettingsStore(store: InMemoryKeyValueStore(), secrets: InMemorySecretStore())
+        let registry = ProviderRegistry(settings: settings)
+        for id in ProviderRegistry.availableIDs {
+            settings.selectedProvider = id
+            #expect(registry.current.id == id)
+        }
     }
 
     @Test func providerFailuresOfferSettingsButDocumentFailuresDont() async throws {
