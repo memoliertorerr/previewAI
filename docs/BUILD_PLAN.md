@@ -49,9 +49,11 @@
 | PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ✅ done |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ✅ done |
-| PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
+| PA13 | Docs, `make dist`, distribution guide | standard | check | ✅ done |
 
-**Overall status:** not started. Sequence: foundation → first runnable (hotkey → panel → Apple
+**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1 and PA10.1).
+What remains is the owner's **Pending human checks** (UI, permissions, real providers) and the
+**Later** items (Developer ID release, App Store build, long-document mode, …). Sequence: foundation → first runnable (hotkey → panel → Apple
 Intelligence) → remaining providers → settings + ship.
 
 **Model note:** Phases 1, 2 and 4's settings step use the stronger model — they fix the
@@ -1024,6 +1026,21 @@ matches the code.
 GitHub Release (the agent does not publish releases).
 **Commit:** `pa-step-13: readme, distribution guide, make dist`
 
+**Implementation notes (2026-11-06):**
+
+- **Added `Resources/PreviewAI-DeveloperID.entitlements`** with
+  `com.apple.security.automation.apple-events`: notarization requires the hardened runtime,
+  which blocks Apple Events without this entitlement — the Finder-selection shortcut would
+  silently stop working in a signed release.
+- **Added `scripts/release.sh`** (sign with hardened runtime + entitlements, notarize via a
+  `notarytool` keychain profile, staple, zip, `spctl` assess) and
+  `Resources/PreviewAI-AppStore.entitlements` for the future App Store target. Both are
+  **untested** — they need the owner's Developer ID certificate / account. `bash -n` passes.
+- `make dist` existed since PA1; verified the zipped app (1.6 MB, zip 428 KB) passes
+  `codesign --verify --deep` after unzipping.
+- README rewritten for users (providers table, entry points, privacy); ARCHITECTURE and AGENTS
+  brought up to date.
+
 ```text
 1. Makefile `dist` target: make app, then `ditto -c -k --keepParent build/PreviewAI.app
    dist/PreviewAI-<version>.zip`.
@@ -1086,6 +1103,10 @@ CI is green, then stop.
   Settings → General → Login Items) and PreviewAI is there; off removes it. About tab shows the
   version and link. The menu shows "Provider: …". After closing the panel, Activity Monitor shows
   PreviewAI's memory back near its idle level.
+- [ ] **PA13** — read README.md and docs/DISTRIBUTION.md for accuracy. When ready to ship:
+  run `scripts/release.sh "Developer ID Application: … (TEAMID)" <profile>` (one-time setup in
+  DISTRIBUTION.md), confirm the notarized app opens without a Gatekeeper warning on another Mac,
+  and decide whether to publish a GitHub Release (the agent doesn't publish releases).
 - [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
   summary for each provider you use: Anthropic key → summary streams
   from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →

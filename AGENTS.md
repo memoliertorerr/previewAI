@@ -28,9 +28,11 @@ SwiftUI, system materials, standard keyboard behavior).
 
 ```
 Package.swift
-Makefile                      build / test / app / verify / dist — the only entry points
-Resources/Info.plist          app bundle Info.plist (LSUIElement, Apple Events usage string)
-scripts/bundle.sh             assembles build/PreviewAI.app from the release binary, ad-hoc signs
+Makefile                      build / test / app / app-appstore / lint / verify / dist — the entry points
+Resources/Info.plist          app bundle Info.plist (LSUIElement, Apple Events usage, NSServices, ATS)
+Resources/*.entitlements      Developer ID (Apple Events) and future App Store (sandbox) entitlements
+scripts/bundle.sh             assembles a .app from a built binary, ad-hoc signs (writes only in repo)
+scripts/release.sh            Developer ID sign + notarize + staple (needs the owner's certificate)
 Sources/PreviewAICore/        all logic that can be unit-tested (no AppKit windows)
   Document/                   DocumentLoader, DocumentContent, budgets/truncation
   Prompt/                     PromptBuilder, SummaryLength
@@ -42,10 +44,12 @@ Sources/PreviewAICore/        all logic that can be unit-tested (no AppKit windo
   EntryPoint.swift            filtering shared by every way a file reaches the app
 Sources/PreviewAI/            the app: AppDelegate (menu + entry points), HotkeyManager (Carbon),
                               FinderSelection (Apple Events, direct build only), ServiceProvider
-                              (Finder Service), SummaryPanel, Settings window
+                              (Finder Service), MainMenu (hidden Edit menu), SummaryPanel/,
+                              Settings/ (window, model, SwiftUI view)
 Tests/PreviewAICoreTests/     unit tests; Fixtures/ for committed sample files and fake CLIs
 docs/BUILD_PLAN.md            the plan and progress tracker (single source of truth for status)
 docs/ARCHITECTURE.md          how the pieces fit (kept current)
+docs/DISTRIBUTION.md          Developer ID signing/notarization and the App Store path
 ```
 
 ## Commands
@@ -53,6 +57,7 @@ docs/ARCHITECTURE.md          how the pieces fit (kept current)
 - `make verify` — the gate. Builds debug, runs all tests, builds the release `.app` bundle, and
   lints the bundle's Info.plist. Must be green before any commit.
 - `make app` — builds `build/PreviewAI.app`. `open build/PreviewAI.app` runs it (a human does this).
+- `make dist` — zipped, ad-hoc-signed app in `dist/`. Signed releases: `scripts/release.sh` (owner only).
 - All SwiftPM invocations go through the Makefile, which pins SwiftPM's cache/config/security
   paths under `.build/` so builds write nothing outside the repo.
 
