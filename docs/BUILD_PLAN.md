@@ -47,7 +47,7 @@
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
 | PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
-| PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
+| PA11 | Settings window + shortcut recorder + Test connection | strong | check | ✅ done |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
 
@@ -934,6 +934,23 @@ Keychain; "Test connection" works for each provider you have). Change the shortc
 the new one works and the old one doesn't. Window looks native in light and dark.
 **Commit:** `pa-step-11: settings window with shortcut recorder and connection test`
 
+**Implementation notes (2026-11-06):**
+
+- **Tabs are General and Providers**; About (and the launch-at-login toggle) come in PA12, which
+  owns those features.
+- **The global hotkey is paused while recording**, otherwise pressing the current shortcut would
+  trigger a summary instead of being recorded. Recording uses a local key-down monitor that
+  swallows keys; logic lives in Core `ShortcutRecorderModel` (tested).
+- **Shortcut warnings** (clashes with an enabled macOS shortcut, or registration refused) show in
+  Settings and as a ⚠︎ line in the menu, which now refreshes each time it opens (NSMenuDelegate).
+- **API key fields never display the key**: a SecureField saves to the Keychain; the placeholder
+  says "Saved in Keychain — type to replace"; Remove deletes it.
+- **OpenAI preset shows its fixed server URL** (read-only) — consistent with PA10.1's lock.
+- **"Open Settings" in the panel now opens PreviewAI Settings → Providers**; the Apple
+  Intelligence section has its own "Open Apple Intelligence Settings" button.
+- `SettingsModel.settings` is a `var` (SwiftUI couldn't form bindings to nested config fields
+  through a `let`).
+
 ```text
 1. App: Settings/SettingsWindowController.swift — a standard NSWindow (titled, closable,
    toolbar-style tabs) hosting SwiftUI SettingsView; activates the app while open, returns to
@@ -1046,8 +1063,13 @@ CI is green, then stop.
   works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
   new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
   again (ad-hoc signature changes — see Landmines).
-- [ ] **PA8–PA10 (providers)** — until the PA11 settings window lands, these can only be
-  exercised once Settings exists; then for each provider you use: Anthropic key → summary streams
+- [ ] **PA11** — open Settings from the menu: General tab (click the shortcut, press a new one;
+  the old one stops working and the new one works; Esc cancels; Delete resets to ⌥⇧Space; try
+  ⌃⌥Space and see the macOS-shortcut warning), default length. Providers tab: picker; each
+  provider's fields; API keys save to the Keychain and are never shown; Ollama "Refresh" lists
+  models; "Test Connection" reports success/failure. Looks native in light and dark.
+- [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
+  summary for each provider you use: Anthropic key → summary streams
   from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →
   summary, and with the server stopped → "Couldn't reach Ollama at localhost:11434 — is it
   running?"; Claude subscription → `claude -p` produces a summary (confirms the CLI accepts

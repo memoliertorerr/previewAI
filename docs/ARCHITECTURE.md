@@ -54,6 +54,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `OpenAICompatibleProvider` | `Core/Providers/` | `POST {base}/chat/completions` streaming for OpenAI / Ollama / LM Studio / custom; Bearer key only when set; `listModels()` via `GET {base}/models`; local-server connection errors say "is it running?". |
 | `ClaudeCodeProvider`, `CodexProvider`, `CLIRunner` | `Core/Providers/` (`#if !APPSTORE`) | Subscriptions via the installed CLIs. Binary discovery (override, then `~/.local/bin`, Homebrew, `/usr/local/bin`, npm/bun/volta). Child gets an extended PATH, cwd `/`, document on stdin; stdout parsed line by line (stream-json / `exec --json`); cancel terminates the child. |
 | `SettingsStore` | `Core/Settings/` | `@Observable` settings persisted as JSON in a `KeyValueStore` (UserDefaults in the app, in-memory in tests). API keys only via `SecretStore` (Keychain), per provider / per OpenAI-compatible preset. |
+| `SettingsWindowController`, `SettingsModel`, `SettingsView` | `App/Settings/` | Standard window (General / Providers) hosting SwiftUI; shortcut recorder (pauses the hotkey while recording; logic in Core `ShortcutRecorderModel`); per-provider forms; Test Connection via Core `ConnectionTester`. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants

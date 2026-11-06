@@ -3,7 +3,7 @@ import PreviewAICore
 import UniformTypeIdentifiers
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private let hotkey = HotkeyManager()
     private let services = ServiceProvider()
@@ -12,8 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var registry = ProviderRegistry(settings: settings)
     private lazy var panelModel = PanelModel(session: session)
     private lazy var panel = SummaryPanelController(model: panelModel)
+    private lazy var settingsModel = SettingsModel(settings: settings, registry: registry)
+    private lazy var settingsWindow = SettingsWindowController(model: settingsModel)
     /// Menu line for problems that shouldn't pop up the panel (e.g. the shortcut is taken).
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let shortcutLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = makeStatusItem()
@@ -22,13 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelModel.length = settings.length
         panelModel.onLengthChange = { [weak self] length in self?.settings.length = length }
 
-        let combo = settings.shortcut
-        if HotkeyManager.isReservedBySystem(combo) {
-            showInMenu("\(combo.displayString) is also a macOS shortcut — change one of them")
+        settingsModel.applyShortcut = { [weak self] combo in self?.hotkey.register(combo) ?? false }
+        settingsModel.setHotkeyPaused = { [weak self] paused in
+            guard let self else { return }
+            if paused { hotkey.unregister() } else { hotkey.register(settings.shortcut) }
         }
-        if !hotkey.register(combo) {
-            showInMenu("Shortcut \(combo.displayString) is taken by another app")
-        }
+        settingsModel.refreshShortcutWarning()  // registers the saved shortcut
 
         panelModel.onOpenSettings = { [weak self] in self?.openProviderSettings() }
 
@@ -118,21 +120,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.show()
     }
 
-    /// Until the PreviewAI settings window exists (PA11), "Open Settings" goes to the
-    /// relevant System Settings pane.
     private func openProviderSettings() {
         panel.close()
-        let pane = URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!
-        if !NSWorkspace.shared.open(pane) {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
-        }
+        settingsWindow.show(tab: .providers)
+    }
+
+    @objc private func openSettings() {
+        settingsWindow.show()
     }
 
     // MARK: - Menu
 
-    private func showInMenu(_ status: String) {
-        statusLine.title = status
-        statusLine.isHidden = false
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        shortcutLine.title = "Shortcut: \(settings.shortcut.displayString)"
+        if let warning = settingsModel.shortcutWarning {
+            statusLine.title = "⚠︎ " + warning
+            statusLine.isHidden = false
+        } else {
+            statusLine.isHidden = true
+        }
     }
 
     private func makeStatusItem() -> NSStatusItem {
@@ -148,16 +154,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
+        menu.delegate = self  // refreshes the shortcut / warning lines each time it opens
 
-        let combo = settings.shortcut
         let summarize = NSMenuItem(title: "Summarize Selection", action: #selector(summarizeSelection), keyEquivalent: "")
         summarize.target = self
-        summarize.toolTip = "Shortcut: \(combo.displayString)"
         menu.addItem(summarize)
 
-        let shortcutHint = NSMenuItem(title: "Shortcut: \(combo.displayString)", action: nil, keyEquivalent: "")
-        shortcutHint.isEnabled = false
-        menu.addItem(shortcutHint)
+        shortcutLine.isEnabled = false
+        menu.addItem(shortcutLine)
 
         let file = NSMenuItem(title: "Summarize File…", action: #selector(summarizeFile), keyEquivalent: "o")
         file.target = self
@@ -168,8 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(statusLine)
 
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: nil, keyEquivalent: ",")
-        settings.isEnabled = false
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
         menu.addItem(settings)
         menu.addItem(NSMenuItem(title: "Quit PreviewAI", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
