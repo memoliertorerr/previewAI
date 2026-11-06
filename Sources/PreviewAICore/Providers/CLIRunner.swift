@@ -51,7 +51,12 @@ struct CLIInvocation: Sendable {
 
 /// Runs a process and streams its stdout line by line. Cancelling the stream terminates the
 /// process. A non-zero exit surfaces the last stderr line.
-enum CLIRunner {
+public enum CLIRunner {
+    /// Kills every running CLI child — call when the app quits so none are orphaned.
+    public static func terminateAll() {
+        CLIJob.terminateAll()
+    }
+
     static func lines(_ invocation: CLIInvocation) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let job = CLIJob(invocation: invocation, continuation: continuation)
@@ -74,6 +79,16 @@ enum CLIRunner {
 /// Owns one child process. Reading happens on a dedicated thread (blocking reads don't belong
 /// on Swift's cooperative pool).
 private final class CLIJob: @unchecked Sendable {
+    private static let registryLock = NSLock()
+    nonisolated(unsafe) private static var running: [ObjectIdentifier: CLIJob] = [:]
+    /// How long a child gets to exit after SIGTERM before SIGKILL.
+    static let killGracePeriod: TimeInterval = 1.5
+
+    static func terminateAll() {
+        let jobs = registryLock.withLock { Array(running.values) }
+        for job in jobs { job.cancel(force: true) }
+    }
+
     private let invocation: CLIInvocation
     private let continuation: AsyncThrowingStream<String, Error>.Continuation
     private let process = Process()
@@ -105,8 +120,13 @@ private final class CLIJob: @unchecked Sendable {
             return
         }
 
+        Self.registryLock.withLock { Self.running[ObjectIdentifier(self)] = self }
+
         let input = Data(invocation.stdin.utf8)
         let stdinHandle = stdinPipe.fileHandleForWriting
+        // If the child exits without reading everything, a write would raise SIGPIPE and kill
+        // the whole app. With NOSIGPIPE the write just fails with EPIPE (ignored below).
+        _ = fcntl(stdinHandle.fileDescriptor, F_SETNOSIGPIPE, 1)
         Thread.detachNewThread {
             try? stdinHandle.write(contentsOf: input)
             try? stdinHandle.close()
@@ -120,9 +140,19 @@ private final class CLIJob: @unchecked Sendable {
         Thread.detachNewThread { [self] in readStdout() }
     }
 
-    func cancel() {
+    func cancel(force: Bool = false) {
         lock.withLock { cancelled = true }
-        if process.isRunning { process.terminate() }
+        guard process.isRunning else { return }
+        let pid = process.processIdentifier
+        if force {
+            kill(pid, SIGKILL)
+            return
+        }
+        process.terminate()
+        // Escalate if the child ignores SIGTERM, so a cancelled job can't keep spending quota.
+        DispatchQueue.global().asyncAfter(deadline: .now() + Self.killGracePeriod) { [self] in
+            if process.isRunning { kill(pid, SIGKILL) }
+        }
     }
 
     private func readStdout() {
@@ -141,6 +171,7 @@ private final class CLIJob: @unchecked Sendable {
         if !buffer.isEmpty { continuation.yield(String(decoding: buffer, as: UTF8.self)) }
 
         process.waitUntilExit()
+        Self.registryLock.withLock { _ = Self.running.removeValue(forKey: ObjectIdentifier(self)) }
         stderrDone.wait()
         let (wasCancelled, stderr) = lock.withLock { (cancelled, stderrData) }
         if wasCancelled {

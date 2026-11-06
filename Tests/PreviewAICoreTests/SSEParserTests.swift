@@ -47,6 +47,12 @@ import Testing
         #expect(events == [SSEEvent(event: "message", data: "héllo 漢字")])
     }
 
+    @Test func acceptsBareCarriageReturns() {
+        var parser = SSEParser()
+        let events = parser.feed(Array("event: a\rdata: one\r\rdata: two\r\n\r\n".utf8))
+        #expect(events == [SSEEvent(event: "a", data: "one"), SSEEvent(event: "message", data: "two")])
+    }
+
     @Test func flushesUnterminatedFinalEvent() {
         var parser = SSEParser()
         var events = parser.feed(Array("data: [DONE]".utf8))

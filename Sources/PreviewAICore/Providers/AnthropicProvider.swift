@@ -35,7 +35,7 @@ public struct AnthropicProvider: SummaryProvider {
     }
 
     func urlRequest(for request: SummaryRequest) throws -> URLRequest {
-        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("v1/messages"))
+        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("v1/messages"), timeoutInterval: 60)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
         urlRequest.setValue(apiKey ?? "", forHTTPHeaderField: "x-api-key")

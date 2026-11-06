@@ -35,10 +35,21 @@ public enum OpenAICompatiblePreset: String, Codable, CaseIterable, Sendable {
 
 public struct OpenAICompatibleConfig: Codable, Equatable, Sendable {
     public var preset: OpenAICompatiblePreset = .openAI
-    /// Empty means the preset's default.
-    public var baseURL: String = ""
+    /// Server URL overrides, kept per preset so a URL typed for one preset is never used with
+    /// another preset's API key.
+    public var baseURLs: [String: String] = [:]
     public var model: String = ""
     public init() {}
+
+    /// The current preset's URL override (empty means the preset's default). OpenAI's URL
+    /// can't be overridden — its key must only ever go to api.openai.com.
+    public var baseURL: String {
+        get { preset == .openAI ? "" : baseURLs[preset.rawValue] ?? "" }
+        set {
+            guard preset != .openAI else { return }
+            baseURLs[preset.rawValue] = newValue
+        }
+    }
 
     public var effectiveBaseURL: String {
         let trimmed = baseURL.trimmingCharacters(in: .whitespaces)

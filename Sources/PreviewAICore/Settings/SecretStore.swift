@@ -3,14 +3,20 @@ import Security
 
 /// API keys. Only ever stored here — never in settings, logs, or files.
 public protocol SecretStore: AnyObject, Sendable {
-    func secret(for account: String) -> String?
+    /// nil when no key is stored; throws when the Keychain refuses access.
+    func secret(for account: String) throws -> String?
     func setSecret(_ value: String?, for account: String) throws
 }
 
 public struct SecretStoreError: LocalizedError, Equatable {
     public let status: OSStatus
     public var errorDescription: String? {
-        "Couldn't save the key to the Keychain (error \(status))."
+        switch status {
+        case errSecAuthFailed, errSecInteractionNotAllowed, errSecUserCanceled:
+            "PreviewAI wasn't allowed to use its Keychain item. Enter your API key again in Settings."
+        default:
+            "The Keychain returned an error (\(status))."
+        }
     }
 }
 
@@ -28,14 +34,17 @@ public final class KeychainSecretStore: SecretStore, @unchecked Sendable {
          kSecAttrAccount as String: account]
     }
 
-    public func secret(for account: String) -> String? {
+    public func secret(for account: String) throws -> String? {
         var query = query(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess: return (result as? Data).flatMap { String(data: $0, encoding: .utf8) }
+        case errSecItemNotFound: return nil
+        default: throw SecretStoreError(status: status)
+        }
     }
 
     public func setSecret(_ value: String?, for account: String) throws {
@@ -51,7 +60,6 @@ public final class KeychainSecretStore: SecretStore, @unchecked Sendable {
         if status == errSecItemNotFound {
             var add = base
             add[kSecValueData as String] = data
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             add[kSecAttrLabel as String] = "PreviewAI API key (\(account))"
             status = SecItemAdd(add as CFDictionary, nil)
         }
@@ -62,11 +70,20 @@ public final class KeychainSecretStore: SecretStore, @unchecked Sendable {
 public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [String: String] = [:]
+    private var _reads = 0
+    /// Accounts whose reads fail as if the Keychain denied access (for tests).
+    public var deniedAccounts: Set<String> = []
 
     public init() {}
 
-    public func secret(for account: String) -> String? {
-        lock.withLock { secrets[account] }
+    public var reads: Int { lock.withLock { _reads } }
+
+    public func secret(for account: String) throws -> String? {
+        try lock.withLock {
+            _reads += 1
+            if deniedAccounts.contains(account) { throw SecretStoreError(status: errSecAuthFailed) }
+            return secrets[account]
+        }
     }
 
     public func setSecret(_ value: String?, for account: String) throws {

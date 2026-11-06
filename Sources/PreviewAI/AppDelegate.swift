@@ -37,6 +37,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSUpdateDynamicServices()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        session.close()
+        #if !APPSTORE
+        CLIRunner.terminateAll()  // don't leave a claude/codex child running after quit
+        #endif
+    }
+
     /// Open With… and dropping files onto the app icon.
     func application(_ application: NSApplication, open urls: [URL]) {
         handle(files: urls)

@@ -8,7 +8,8 @@ public struct HTTPClient: Sendable {
     public static let shared = HTTPClient()
 
     public init(configuration: URLSessionConfiguration = .ephemeral) {
-        configuration.timeoutIntervalForRequest = 60
+        // Upper bound; requests set their own (cloud 60 s, local servers longer).
+        configuration.timeoutIntervalForRequest = 300
         configuration.timeoutIntervalForResource = 600
         configuration.waitsForConnectivity = false
         session = URLSession(configuration: configuration)

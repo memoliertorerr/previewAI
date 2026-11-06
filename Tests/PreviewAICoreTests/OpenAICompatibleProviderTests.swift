@@ -22,9 +22,9 @@ import Testing
         let base = StubURLProtocol.register(response).appendingPathComponent("v1")
         var config = OpenAICompatibleConfig()
         config.preset = preset
-        config.baseURL = base.absoluteString
         config.model = model
-        return (OpenAICompatibleProvider(config: config, apiKey: key, http: StubURLProtocol.client()), base)
+        // Explicit test override: the config itself refuses to redirect the OpenAI preset.
+        return (OpenAICompatibleProvider(config: config, apiKey: key, http: StubURLProtocol.client(), baseURLOverride: base), base)
     }
 
     @Test func presetsResolveToDocumentedURLs() {
@@ -113,6 +113,46 @@ import Testing
         #expect(urlReason.contains("server URL"))
         let ready = OpenAICompatibleProvider(config: .preset(.lmStudio, model: "m"), apiKey: nil)
         #expect(await ready.availability() == .ready)
+    }
+
+    @Test func baseURLsArePerPresetAndOpenAICantBeRedirected() {
+        var config = OpenAICompatibleConfig()
+        config.preset = .custom
+        config.baseURL = "http://192.168.1.5:8000/v1"
+        config.preset = .openAI
+        #expect(config.effectiveBaseURL == "https://api.openai.com/v1")
+        config.baseURL = "https://evil.example/v1"
+        #expect(config.effectiveBaseURL == "https://api.openai.com/v1")
+        config.preset = .ollama
+        #expect(config.effectiveBaseURL == "http://localhost:11434/v1")
+        config.preset = .custom
+        #expect(config.effectiveBaseURL == "http://192.168.1.5:8000/v1")
+    }
+
+    @Test func keysAreNeverSentOverPlainHTTPToOtherMachines() async throws {
+        var config = OpenAICompatibleConfig.preset(.custom, model: "m")
+        config.baseURL = "http://192.168.1.5:8000/v1"
+        let lan = OpenAICompatibleProvider(config: config, apiKey: "secret")
+        guard case .unavailable(let reason) = await lan.availability() else { Issue.record("should refuse"); return }
+        #expect(reason.contains("unencrypted HTTP"))
+        var request = URLRequest(url: URL(string: "http://192.168.1.5:8000/v1/chat/completions")!)
+        lan.authorized(&request)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+
+        // Keyless LAN servers are fine; keys over http are fine only to this Mac.
+        #expect(await OpenAICompatibleProvider(config: config, apiKey: nil).availability() == .ready)
+        #expect(OpenAICompatibleProvider.isSafeForKey(URL(string: "http://localhost:1234/v1")!))
+        #expect(OpenAICompatibleProvider.isSafeForKey(URL(string: "http://127.0.0.1:1234/v1")!))
+        #expect(OpenAICompatibleProvider.isSafeForKey(URL(string: "https://example.com/v1")!))
+        #expect(!OpenAICompatibleProvider.isSafeForKey(URL(string: "http://example.com/v1")!))
+    }
+
+    @Test func timeoutsHaveTheirOwnMessageAndLocalWaitsLonger() {
+        let local = OpenAICompatibleProvider(config: .preset(.ollama, model: "m"), apiKey: nil)
+        #expect(local.requestTimeout == 300)
+        #expect(OpenAICompatibleProvider(config: .preset(.openAI, model: "m"), apiKey: "k").requestTimeout == 60)
+        guard case .network(let message) = local.networkError(URLError(.timedOut)) else { Issue.record("expected network"); return }
+        #expect(message.contains("still be loading the model"))
     }
 
     @Test func budgetsDependOnPreset() {

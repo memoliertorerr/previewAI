@@ -158,3 +158,39 @@ import Testing
     }
 }
 #endif
+
+#if !APPSTORE
+@Suite struct CLIRobustnessTests {
+    let fakeBin = TestSupport.fixture("bin").path
+
+    func claude(mode: String, log: String) -> ClaudeCodeProvider {
+        var provider = ClaudeCodeProvider(config: CLIConfig(), directories: [fakeBin])
+        provider.extraEnvironment = ["FAKE_MODE": mode, "FAKE_LOG": log]
+        return provider
+    }
+
+    /// Without SIGPIPE protection this kills the whole test process (and, in the app, PreviewAI).
+    @Test func childExitingBeforeReadingLargeStdinDoesNotCrash() async throws {
+        let log = try TestSupport.scratch().appendingPathComponent("cli").path
+        let huge = String(repeating: "A long document line that the CLI never reads.\n", count: 20_000)  // ~1 MB
+        let request = SummaryRequest(system: "S", user: huge, maxOutputTokens: 100)
+        let result = await collect(claude(mode: "early-exit", log: log).stream(request))
+        #expect(result.error as? ProviderError == .process("Claude Code: error: unknown option '--effort'"))
+    }
+
+    @Test func cancelEscalatesToKillWhenTermIsIgnored() async throws {
+        let log = try TestSupport.scratch().appendingPathComponent("cli").path
+        let provider = claude(mode: "stubborn", log: log)
+        let task = Task {
+            for try await _ in provider.stream(SummaryRequest(system: "S", user: "U", maxOutputTokens: 1)) { break }
+        }
+        _ = await task.result
+        let pid = try #require(pid_t(try String(contentsOfFile: log + ".pid", encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)))
+        let deadline = ContinuousClock.now + .seconds(6)
+        while kill(pid, 0) == 0, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(kill(pid, 0) != 0, "stubborn fake claude (pid \(pid)) survived cancel")
+    }
+}
+#endif

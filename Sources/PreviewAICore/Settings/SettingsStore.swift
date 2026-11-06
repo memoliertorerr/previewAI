@@ -20,6 +20,9 @@ public final class SettingsStore {
     /// With @Observable, assignments in init go through the observed setter and fire didSet,
     /// so saving is suppressed until loading is done.
     @ObservationIgnored private var isLoading = true
+    /// Keys are read from the Keychain once, then kept in memory: a Keychain read can block on
+    /// a system prompt, which shouldn't happen on every hotkey press.
+    @ObservationIgnored private var keyCache: [String: String?] = [:]
     /// Bumped when a key changes so views that show "key saved" refresh.
     public private(set) var secretsVersion = 0
 
@@ -51,16 +54,26 @@ public final class SettingsStore {
         }
     }
 
+    /// The stored key, or nil if none (or the Keychain refused — use `loadAPIKey` to tell).
     public func apiKey(for provider: ProviderID) -> String? {
+        (try? loadAPIKey(for: provider)) ?? nil
+    }
+
+    /// The stored key; throws `SecretStoreError` if the Keychain refused access.
+    public func loadAPIKey(for provider: ProviderID) throws -> String? {
         _ = secretsVersion  // observation dependency
         guard let account = secretAccount(for: provider) else { return nil }
-        return secrets.secret(for: account)
+        if let cached = keyCache[account] { return cached }
+        let key = try secrets.secret(for: account)
+        keyCache[account] = key
+        return key
     }
 
     public func setAPIKey(_ key: String?, for provider: ProviderID) throws {
         guard let account = secretAccount(for: provider) else { return }
         let trimmed = key?.trimmingCharacters(in: .whitespacesAndNewlines)
         try secrets.setSecret(trimmed, for: account)
+        keyCache[account] = (trimmed?.isEmpty ?? true) ? nil : trimmed
         secretsVersion += 1
     }
 

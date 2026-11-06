@@ -46,6 +46,7 @@
 | PA8 | SSE parser + Anthropic provider | standard | auto | ✅ done |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
+| PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
@@ -888,6 +889,37 @@ This ends phase 3: push the branch, open the PR using the PR description templat
 CI is green, then stop.
 ```
 
+### PA10.1 — Review fixes before merging phase 3 · strong · auto
+
+> **Added mid-plan 2026-11-06** — an independent read-only review of the phase 3 diff found two
+> high-severity bugs no test covered. Fixed on the phase branch before merge.
+
+**Verify:** `make verify` green, including new tests: a fake CLI that exits without reading a
+~1 MB stdin doesn't kill the process (before the fix the test runner died with signal 13); a
+fake CLI that ignores SIGTERM is gone after cancel; the OpenAI preset can't be redirected to
+another URL and keys are never sent over plain HTTP to a non-loopback host; a denied Keychain read
+produces a Keychain message (not "Add your key"); keys are read from the Keychain once; SSE
+accepts bare-CR line endings; local servers get a 300 s timeout and a "still loading" message.
+**Commit:** `pa-step-10.1: review fixes — sigpipe, per-preset urls, keychain errors, kill escalation`
+
+**Implementation notes (2026-11-06):**
+
+- **SIGPIPE crash (high):** writing a large document to a CLI that exits early raised SIGPIPE and
+  would kill PreviewAI (reproduced: test runner exited with signal 13). Fixed with
+  `F_SETNOSIGPIPE` on the stdin pipe plus `signal(SIGPIPE, SIG_IGN)` at launch.
+- **Key could reach the wrong server (high):** one shared `baseURL` meant a custom/LAN URL stayed
+  in effect after switching back to OpenAI. Base URLs are now stored per preset, OpenAI's can't
+  be overridden, and keys are only attached over HTTPS or to localhost.
+- **Cancel escalation:** SIGTERM, then SIGKILL after 1.5 s; all CLI children are killed on quit.
+- **Keychain:** reads throw on denial (`errSecAuthFailed` etc.) and the registry turns that into a
+  clear message; keys are cached in memory after the first read so a Keychain prompt can't
+  block every hotkey press. Dropped the no-op `kSecAttrAccessible` on the file-based keychain.
+- **Timeouts:** per-request (cloud 60 s, local presets 300 s — model loading can be slow);
+  `.timedOut` has its own message instead of "is it running?".
+- **SSE:** bare `\r` line endings accepted.
+- **Landmine hit while testing:** the first (crashing) run orphaned the "stubborn" fake CLI in an
+  infinite loop; it was killed by hand. Tests now terminate such children via the kill escalation.
+
 ---
 
 ### PA11 — Settings window · strong · check
@@ -1020,7 +1052,9 @@ CI is green, then stop.
   summary, and with the server stopped → "Couldn't reach Ollama at localhost:11434 — is it
   running?"; Claude subscription → `claude -p` produces a summary (confirms the CLI accepts
   `--setting-sources project --effort low` with a subscription login); Codex subscription →
-  `codex exec` produces a summary.
+  `codex exec` produces a summary. After a rebuild, the first use of a saved API key may show a
+  macOS Keychain prompt (ad-hoc signature changed) — "Always Allow" it; "Deny" should produce a
+  "wasn't allowed to use its Keychain item" message, not "Add your API key".
 
 ---
 
@@ -1050,6 +1084,10 @@ Populated from real friction, not speculation:
   while still `NSURL` (PA6.1).
 - **`@Observable` fires `didSet` during `init`.** Unlike plain classes, observed properties
   assigned in `init` run their observers — guard persistence while loading (PA7).
+- **SIGPIPE kills the app by default.** Any write to a child's stdin after it exits raises
+  SIGPIPE; set `F_SETNOSIGPIPE` on pipes and ignore SIGPIPE app-wide (PA10.1).
+- **A crashing test run can orphan fake CLI children.** If the test process dies mid-test, a
+  long-running fake keeps running; check `pgrep -fl Fixtures/bin` after a crash (PA10.1).
 - **Ad-hoc signatures change on every rebuild.** macOS keys Automation (TCC) grants and Keychain
   item access to the code signature, so after a rebuild expect the Finder permission prompt and
   a Keychain "allow" prompt again. Fixed properly by Developer ID signing (Later).

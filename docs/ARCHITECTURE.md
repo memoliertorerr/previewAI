@@ -66,6 +66,14 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 
 Rule: any code using `NSAppleScript` or `Process` must be inside `#if !APPSTORE`.
 
+## Safety rules in the providers
+
+- API keys: Keychain only, cached in memory after the first read; a denied read is reported as
+  such. OpenAI-compatible keys are per preset; base URLs are per preset; OpenAI's URL is fixed.
+  Keys are attached only over HTTPS or to localhost.
+- CLI children: `F_SETNOSIGPIPE` on stdin and SIGPIPE ignored app-wide; cancel sends SIGTERM then
+  SIGKILL after 1.5 s; all children are killed when the app quits.
+
 ## Testing boundaries
 
 Tests never touch the network, real AI CLIs, the real Keychain, real `UserDefaults` suites, or

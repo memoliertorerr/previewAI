@@ -22,14 +22,23 @@ public final class ProviderRegistry {
         provider(for: settings.selectedProvider)
     }
 
+    /// A denied Keychain read becomes a clear message instead of a misleading "add your key".
+    private func withKey(for id: ProviderID, _ make: (String?) -> any SummaryProvider) -> any SummaryProvider {
+        do {
+            return make(try settings.loadAPIKey(for: id))
+        } catch {
+            return UnavailableProvider(id: id, reason: error.localizedDescription)
+        }
+    }
+
     public func provider(for id: ProviderID) -> any SummaryProvider {
         switch id {
         case .appleIntelligence:
             AppleIntelligenceProvider()
         case .anthropic:
-            AnthropicProvider(apiKey: settings.apiKey(for: .anthropic), model: settings.anthropic.model)
+            withKey(for: .anthropic) { AnthropicProvider(apiKey: $0, model: settings.anthropic.model) }
         case .openAICompatible:
-            OpenAICompatibleProvider(config: settings.openAICompatible, apiKey: settings.apiKey(for: .openAICompatible))
+            withKey(for: .openAICompatible) { OpenAICompatibleProvider(config: settings.openAICompatible, apiKey: $0) }
         #if APPSTORE
         case .claudeCode, .codex:
             UnavailableProvider(id: id, reason: "\(id.displayName) isn't available in the App Store version of PreviewAI.")

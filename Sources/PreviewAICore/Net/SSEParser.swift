@@ -11,14 +11,22 @@ public struct SSEParser: Sendable {
     private var line: [UInt8] = []
     private var event = ""
     private var data: [String] = []
+    /// The previous byte was a bare CR, so a following LF belongs to the same line ending.
+    private var afterCR = false
 
     public init() {}
 
     public mutating func feed<S: Sequence>(_ bytes: S) -> [SSEEvent] where S.Element == UInt8 {
         var events: [SSEEvent] = []
+        // Lines end with LF, CRLF, or a bare CR (all allowed by the SSE spec).
         for byte in bytes {
-            if byte == UInt8(ascii: "\n") {
-                if line.last == UInt8(ascii: "\r") { line.removeLast() }
+            if byte == UInt8(ascii: "\n") && afterCR {
+                afterCR = false
+                continue
+            }
+            afterCR = false
+            if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") {
+                afterCR = byte == UInt8(ascii: "\r")
                 if let event = process(String(decoding: line, as: UTF8.self)) { events.append(event) }
                 line.removeAll(keepingCapacity: true)
             } else {

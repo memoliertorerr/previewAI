@@ -6,9 +6,15 @@ public struct OpenAICompatibleProvider: SummaryProvider {
     public let id = ProviderID.openAICompatible
     public let modelName: String
     public let preset: OpenAICompatiblePreset
-    private let baseURLString: String
+    private var baseURLString: String
     private let apiKey: String?
     private let http: HTTPClient
+
+    /// `baseURLOverride` is for tests only (it bypasses the OpenAI-URL lock in the config).
+    init(config: OpenAICompatibleConfig, apiKey: String?, http: HTTPClient = .shared, baseURLOverride: URL?) {
+        self.init(config: config, apiKey: apiKey, http: http)
+        if let baseURLOverride { self.baseURLString = baseURLOverride.absoluteString }
+    }
 
     public init(config: OpenAICompatibleConfig, apiKey: String?, http: HTTPClient = .shared) {
         self.preset = config.preset
@@ -38,8 +44,11 @@ public struct OpenAICompatibleProvider: SummaryProvider {
         if preset.needsAPIKey && apiKey == nil {
             return .unavailable("Add your \(preset.displayName) API key in PreviewAI Settings.")
         }
-        guard baseURL != nil else {
+        guard let baseURL else {
             return .unavailable("Set a valid server URL for \(preset.displayName) in PreviewAI Settings.")
+        }
+        if apiKey != nil, !Self.isSafeForKey(baseURL) {
+            return .unavailable("PreviewAI won't send your API key over unencrypted HTTP to \(baseURL.host ?? "that server"). Use an https:// URL.")
         }
         guard !modelName.isEmpty else {
             return .unavailable("Choose a model for \(preset.displayName) in PreviewAI Settings.")
@@ -48,12 +57,22 @@ public struct OpenAICompatibleProvider: SummaryProvider {
     }
 
     func authorized(_ request: inout URLRequest) {
-        if let apiKey { request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
+        guard let apiKey, let url = request.url, Self.isSafeForKey(url) else { return }
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
     }
+
+    /// Keys go only over HTTPS, or plain HTTP to this Mac itself.
+    static func isSafeForKey(_ url: URL) -> Bool {
+        if url.scheme == "https" { return true }
+        return ["localhost", "127.0.0.1", "::1", "[::1]"].contains(url.host ?? "")
+    }
+
+    /// Local servers may spend minutes loading a model before the first byte.
+    var requestTimeout: TimeInterval { preset.isLocal ? 300 : 60 }
 
     func urlRequest(for request: SummaryRequest) throws -> URLRequest {
         guard let baseURL else { throw ProviderError.notConfigured("The \(preset.displayName) server URL isn't valid.") }
-        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
+        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("chat/completions"), timeoutInterval: requestTimeout)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         authorized(&urlRequest)
@@ -148,7 +167,10 @@ public struct OpenAICompatibleProvider: SummaryProvider {
 
     func networkError(_ error: URLError) -> ProviderError {
         let place = baseURL.map { "\($0.host ?? "")\($0.port.map { ":\($0)" } ?? "")" } ?? baseURLString
-        if preset.isLocal, [.cannotConnectToHost, .networkConnectionLost, .timedOut, .cannotFindHost].contains(error.code) {
+        if error.code == .timedOut {
+            return .network("\(preset.displayName) at \(place) didn't respond in time\(preset.isLocal ? " — it may still be loading the model. Try again in a moment." : ".")")
+        }
+        if preset.isLocal, [.cannotConnectToHost, .networkConnectionLost, .cannotFindHost].contains(error.code) {
             return .network("Couldn't reach \(preset.displayName) at \(place) — is it running?")
         }
         return .network("Couldn't reach \(preset.displayName) at \(place): \(error.localizedDescription)")

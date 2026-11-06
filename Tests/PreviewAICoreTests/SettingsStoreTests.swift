@@ -56,7 +56,7 @@ import Testing
         settings.anthropic.model = "claude-sonnet-5-5"  // force some settings writes too
 
         #expect(settings.apiKey(for: .anthropic) == key)
-        #expect(secrets.secret(for: "anthropic") == key)
+        #expect(try secrets.secret(for: "anthropic") == key)
         for (name, data) in store.values {
             #expect(!String(decoding: data, as: UTF8.self).contains(key), "key leaked into \(name)")
         }
@@ -78,7 +78,29 @@ import Testing
         let (settings, _, secrets) = make()
         try settings.setAPIKey("x", for: .appleIntelligence)
         #expect(settings.apiKey(for: .appleIntelligence) == nil)
-        #expect(secrets.secret(for: "appleIntelligence") == nil)
+        #expect(try secrets.secret(for: "appleIntelligence") == nil)
+    }
+
+    @Test func keysAreReadOnceThenCached() throws {
+        let (settings, _, secrets) = make()
+        try secrets.setSecret("sk", for: "anthropic")
+        #expect(settings.apiKey(for: .anthropic) == "sk")
+        #expect(settings.apiKey(for: .anthropic) == "sk")
+        #expect(secrets.reads == 1)
+        try settings.setAPIKey("sk2", for: .anthropic)
+        #expect(settings.apiKey(for: .anthropic) == "sk2")
+        #expect(secrets.reads == 1)
+    }
+
+    @Test func deniedKeychainReadBecomesAClearProviderMessage() async throws {
+        let (settings, _, secrets) = make()
+        secrets.deniedAccounts = ["anthropic"]
+        settings.selectedProvider = .anthropic
+        #expect(throws: SecretStoreError.self) { try settings.loadAPIKey(for: .anthropic) }
+        let provider = ProviderRegistry(settings: settings).current
+        guard case .unavailable(let reason) = await provider.availability() else { Issue.record("should be unavailable"); return }
+        #expect(reason.contains("Keychain"))
+        #expect(!reason.contains("Add your"))
     }
 
     @Test func customBaseURLOverridesPreset() {
