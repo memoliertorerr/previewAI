@@ -35,9 +35,9 @@
 
 | Step | Scope | Model | Gate | Status |
 |------|-------|-------|------|--------|
-| PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ⬜ todo |
-| PA2 | Document loading + per-provider text budgets | strong | auto | ⬜ todo |
-| PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ⬜ todo |
+| PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ✅ done |
+| PA2 | Document loading + per-provider text budgets | strong | auto | ✅ done |
+| PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ✅ done |
 | PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ⬜ todo |
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ⬜ todo |
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ⬜ todo |
@@ -273,6 +273,17 @@ produces `build/PreviewAI.app` whose `Contents/Info.plist` passes `plutil -lint`
 `LSUIElement = true`; the `APPSTORE=1` variant also builds; `.github/workflows/ci.yml` exists.
 **Commit:** `pa-step-1: swiftpm scaffold, menu-bar shell, make verify, ci`
 
+**Implementation notes (2026-11-06):**
+
+- **`scripts/bundle.sh` takes `<binary> <app path>`** instead of building itself; the Makefile
+  does the build so the pinned SwiftPM paths live in one place. It refuses to write outside the
+  repo.
+- **The APPSTORE variant uses its own scratch dir** (`.build/appstore`) so switching `-D` flags
+  doesn't force full rebuilds of the normal build.
+- **`make lint` also runs `codesign --verify --deep`** on both bundles.
+- The core constants enum is `PreviewAIInfo` (not `PreviewAI`) to avoid clashing with the
+  executable module name.
+
 ```text
 Create the project skeleton. Nothing user-facing beyond a menu-bar icon.
 
@@ -335,6 +346,15 @@ RTF and an HTML fixture load as plain text; (d) an unsupported file (`.png`) thr
 a whitespace/paragraph boundary, `isTruncated == true`, `fractionIncluded ≈ 0.4`.
 **Commit:** `pa-step-2: document loader for pdf/md/txt/rtf/docx/html with budgets`
 
+**Implementation notes (2026-11-06):**
+
+- **HTML loads on the main actor**: the `NSAttributedString` HTML importer is WebKit-backed and
+  documented as main-thread only. Other kinds extract in a detached task.
+- **Budget cut rule:** prefer a paragraph break within the last 20% of the window, otherwise
+  the last whitespace — keeps truncation from discarding most of the budget on one early break.
+- Added a DOCX test (generated with `NSAttributedString` `.officeOpenXML` export) and a
+  paragraph-boundary test beyond the Verify list.
+
 ```text
 Build the document layer in Sources/PreviewAICore/Document/.
 
@@ -383,6 +403,20 @@ mock stream and leaves `.idle`; (e) a second request for the same file + mtime +
 length is served from `SummaryCache` without calling the provider; (f) the cache evicts beyond
 its capacity (LRU, 20 entries).
 **Commit:** `pa-step-3: provider contract, prompt builder, summary session, cache`
+
+**Implementation notes (2026-11-06):**
+
+- **`SummaryProvider` gained `modelName`** — needed for the cache key (the plan's key includes
+  the model) and for the panel's provider label.
+- **The mock lives in Core as `ScriptedProvider`** now, rather than being moved there in PA5;
+  tests and the PA5 demo share it.
+- **`SummarySession.stateDidChange`** callback added (tests record transitions with it; the app
+  may use it for panel sizing). `close()` and `waitUntilSettled()` added; PA12 builds on `close()`.
+- **`regenerate(length:)`**: with no argument it bypasses the cache; with a new length it uses
+  the cache (switching back to a length you already saw is instant).
+- **Landmine found:** a fixed-sleep cancel test was flaky under parallel test load; the test now
+  cancels on the first streamed chunk and asserts the provider's stream was torn down.
+- Added `ProviderError.emptyResponse` (whitespace-only output fails instead of showing blank).
 
 ```text
 Define the contract every provider and the panel depend on. Get the shape right — every later
@@ -840,6 +874,8 @@ Populated from real friction, not speculation:
   is an owner check.
 - **`claude --bare` ignores subscription login** — per `claude --help`, bare mode reads only
   `ANTHROPIC_API_KEY`. The Claude Code provider must not use it.
+- **Fixed sleeps make async tests flaky.** Under parallel Swift Testing load a 300 ms sleep
+  sometimes elapsed before the stream started. Drive timing from state callbacks instead (PA3).
 - **Ad-hoc signatures change on every rebuild.** macOS keys Automation (TCC) grants and Keychain
   item access to the code signature, so after a rebuild expect the Finder permission prompt and
   a Keychain "allow" prompt again. Fixed properly by Developer ID signing (Later).
