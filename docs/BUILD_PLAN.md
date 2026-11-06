@@ -39,7 +39,7 @@
 | PA2 | Document loading + per-provider text budgets | strong | auto | ✅ done |
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ✅ done |
 | PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ✅ done |
-| PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ⬜ todo |
+| PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ✅ done |
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ⬜ todo |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
@@ -554,6 +554,23 @@ stealing Finder's selection, uses system vibrancy, renders Markdown (bold, bulle
 is readable in light and dark mode; Esc and the hotkey close it; ⌘C copies the summary.
 **Commit:** `pa-step-5: quick-look style floating summary panel`
 
+**Implementation notes (2026-11-06):**
+
+- **Borderless panel** with its own close button instead of a titled one — a cleaner floating
+  look; Liquid Glass via `NSGlassEffectView` (corner radius 18) on macOS 26, `NSVisualEffectView`
+  `.popover` (state forced `.active`) on 14–15.
+- **Copy is ⇧⌘C**, not ⌘C, so ⌘C keeps copying a text selection. Regenerate is ⌘R.
+- **Every entry point uses a canned demo provider in this step** (in all builds, not just DEBUG
+  — `make app` is a release build). PA6 replaces it with the provider registry.
+- **Hints show in the panel** ("Select a document in Finder…", Automation denied, APPSTORE
+  hint) via a new `SummarySession.showMessage(_:)`; the menu status line is kept only for
+  "shortcut is taken".
+- **`MarkdownBlock` parser** added to Core (headings, bullets with nesting, numbered lists,
+  rules, paragraphs; tolerant of partial streams) because `AttributedString(markdown:)` only
+  renders inline styles in SwiftUI `Text`. Tested.
+- The panel is centered on the mouse's screen each time and keeps its size while the app runs;
+  persisting the size is left to PA7 settings if wanted.
+
 ```text
 Build the panel the user sees. Native first: system materials, system fonts, standard keys.
 
@@ -873,6 +890,13 @@ CI is green, then stop.
   "Summarize with PreviewAI" exists; bind it in System Settings → Keyboard → Keyboard Shortcuts
   → Services → Files and Folders and confirm the shortcut triggers it. (The Service may only
   appear after the app has been launched once, or after moving it to /Applications.)
+- [ ] **PA5** — select any supported file in Finder and press ⌃⌥Space: the panel appears
+  centered on the screen with the mouse, floats over Finder without stealing its selection
+  (Finder stays frontmost), uses glass/vibrancy, and a canned demo summary streams in with
+  headings, bold, bullets and numbers rendered. Readable in light and dark mode. Esc, the ×
+  button, and pressing ⌃⌥Space again all close it; ⇧⌘C copies the summary; ⌘R regenerates;
+  the Brief/Standard/Detailed switch restarts it. Press ⌃⌥Space with Finder *not* frontmost →
+  the panel shows "Select a document in Finder…".
 
 ---
 

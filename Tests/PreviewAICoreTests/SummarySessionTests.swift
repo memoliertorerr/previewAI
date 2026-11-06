@@ -138,6 +138,12 @@ import Testing
         #expect(provider.calls.count == 1)
     }
 
+    @Test func showMessageFailsWithoutDocument() {
+        let session = SummarySession()
+        session.showMessage("Select a document in Finder first")
+        #expect(session.state == .failed(nil, "Select a document in Finder first"))
+    }
+
     private func failedInfo() -> DocumentInfo {
         var info = DocumentInfo(url: file)
         info.kind = .markdown

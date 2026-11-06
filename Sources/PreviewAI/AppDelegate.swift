@@ -7,7 +7,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let hotkey = HotkeyManager()
     private let services = ServiceProvider()
-    /// Temporary feedback line in the menu until the panel exists (PA6 replaces it).
+    private let session = SummarySession()
+    private lazy var panelModel = PanelModel(session: session)
+    private lazy var panel = SummaryPanelController(model: panelModel)
+    /// Menu line for problems that shouldn't pop up the panel (e.g. the shortcut is taken).
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -15,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
         if !hotkey.register(.default) {
-            show(status: "Shortcut \(KeyCombo.default.displayString) is taken by another app")
+            showInMenu("Shortcut \(KeyCombo.default.displayString) is taken by another app")
         }
 
         services.onFiles = { [weak self] urls in self?.handle(files: urls) }
@@ -31,20 +34,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Entry points
 
     private func hotkeyPressed() {
+        // Like Space in Quick Look: the shortcut toggles the panel.
+        if panel.isVisible {
+            panel.close()
+            return
+        }
+        summarizeFinderSelection()
+    }
+
+    private func summarizeFinderSelection() {
         #if APPSTORE
-        show(status: "Right-click a file → Quick Actions → Summarize with PreviewAI")
+        showInPanel("Right-click a document in Finder → Quick Actions → Summarize with PreviewAI.")
         #else
         switch FinderSelection.current() {
         case .files(let urls): handle(files: urls)
-        case .notFinder, .empty: show(status: "Select a document in Finder first")
-        case .permissionDenied: show(status: "Allow PreviewAI to control Finder in System Settings → Privacy & Security → Automation")
-        case .failed(let message): show(status: message)
+        case .notFinder, .empty: showInPanel("Select a document in Finder, then press \(KeyCombo.default.displayString).")
+        case .permissionDenied: showInPanel("PreviewAI needs permission to see Finder's selection. Allow it in System Settings → Privacy & Security → Automation → PreviewAI → Finder.")
+        case .failed(let message): showInPanel(message)
         }
         #endif
     }
 
     @objc private func summarizeSelection() {
-        hotkeyPressed()
+        summarizeFinderSelection()
     }
 
     @objc private func summarizeFile() {
@@ -62,16 +74,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handle(files urls: [URL]) {
         let files = EntryPoint.resolveFiles(urls)
         guard let first = files.first else {
-            show(status: "No readable document was selected")
+            showInPanel("That selection isn't a document PreviewAI can read.")
             return
         }
-        let more = files.count > 1 ? " (+\(files.count - 1) more)" : ""
-        show(status: "Last file: \(first.lastPathComponent)\(more)")
+        panelModel.additionalFiles = files.count - 1
+        panel.show()
+        session.summarize(url: first, provider: Self.demoProvider(), length: panelModel.length)
+    }
+
+    private func showInPanel(_ message: String) {
+        panelModel.additionalFiles = 0
+        session.showMessage(message)
+        panel.show()
+    }
+
+    /// Temporary until PA6 wires real providers: streams a canned summary.
+    private static func demoProvider() -> ScriptedProvider {
+        let text = """
+        **TL;DR:** This is a demo summary that streams in word by word so the panel can be reviewed before real providers are connected.
+
+        ### What it shows
+        - Headings, **bold**, *italic* and `code` render inline
+        - Bullet lists, including nested ones:
+          - like this one
+        1. Numbered steps
+        2. Keep their numbers
+
+        Why it matters: the real summary will look exactly like this.
+        """
+        let words = text.split(separator: " ", omittingEmptySubsequences: false).map { String($0) + " " }
+        return ScriptedProvider(displayName: "Demo", modelName: "", chunks: words, delay: .milliseconds(25))
     }
 
     // MARK: - Menu
 
-    private func show(status: String) {
+    private func showInMenu(_ status: String) {
         statusLine.title = status
         statusLine.isHidden = false
     }

@@ -81,6 +81,12 @@ public final class SummarySession {
         state = .idle
     }
 
+    /// Shows a message without a document (e.g. "Select a document in Finder first").
+    public func showMessage(_ message: String) {
+        cancel()
+        state = .failed(nil, message)
+    }
+
     /// Cancels work and forgets the last request and its text (frees memory when the panel closes).
     public func close() {
         cancel()
