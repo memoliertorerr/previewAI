@@ -49,6 +49,11 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `SummaryPanelController`, `SummaryView`, `PanelModel` | `App/SummaryPanel/` | Borderless, non-activating floating `NSPanel` (Liquid Glass on macOS 26) hosting SwiftUI. Esc/×/shortcut close it; closing calls `session.close()`. |
 | `AppleIntelligenceProvider` | `Core/Providers/` | FoundationModels (`#if canImport`, macOS 26+). Budget derived from `contextSize`; snapshots → deltas via `DeltaTracker`. |
 | `ProviderRegistry`, `UnavailableProvider` | `Core/Providers/` | Builds the selected provider; unconfigured ones explain themselves. |
+| `SSEParser`, `HTTPClient` | `Core/Net/` | Incremental SSE parsing over raw bytes; ephemeral `URLSession` wrapper; `HTTPFailure` error-body parsing. |
+| `AnthropicProvider` | `Core/Providers/` | `POST /v1/messages`, `anthropic-version: 2026-10-21`, streaming, `output_config.effort: low`, `fallbacks: "default"` for Opus/Sonnet; only `text_delta` text is shown; refusals and stream errors map to `ProviderError`. |
+| `OpenAICompatibleProvider` | `Core/Providers/` | `POST {base}/chat/completions` streaming for OpenAI / Ollama / LM Studio / custom; Bearer key only when set; `listModels()` via `GET {base}/models`; local-server connection errors say "is it running?". |
+| `ClaudeCodeProvider`, `CodexProvider`, `CLIRunner` | `Core/Providers/` (`#if !APPSTORE`) | Subscriptions via the installed CLIs. Binary discovery (override, then `~/.local/bin`, Homebrew, `/usr/local/bin`, npm/bun/volta). Child gets an extended PATH, cwd `/`, document on stdin; stdout parsed line by line (stream-json / `exec --json`); cancel terminates the child. |
+| `SettingsStore` | `Core/Settings/` | `@Observable` settings persisted as JSON in a `KeyValueStore` (UserDefaults in the app, in-memory in tests). API keys only via `SecretStore` (Keychain), per provider / per OpenAI-compatible preset. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants
@@ -60,6 +65,14 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
   selection) and no `Process`-spawning CLI providers, so the code stays sandbox-compatible.
 
 Rule: any code using `NSAppleScript` or `Process` must be inside `#if !APPSTORE`.
+
+## Safety rules in the providers
+
+- API keys: Keychain only, cached in memory after the first read; a denied read is reported as
+  such. OpenAI-compatible keys are per preset; base URLs are per preset; OpenAI's URL is fixed.
+  Keys are attached only over HTTPS or to localhost.
+- CLI children: `F_SETNOSIGPIPE` on stdin and SIGPIPE ignored app-wide; cancel sends SIGTERM then
+  SIGKILL after 1.5 s; all children are killed when the app quits.
 
 ## Testing boundaries
 

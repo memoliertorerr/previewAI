@@ -42,10 +42,11 @@
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ✅ done |
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ✅ done |
 | PA6.1 | Review fixes before merging phase 2 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
-| PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
-| PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
-| PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
-| PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ⬜ todo |
+| PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ✅ done |
+| PA8 | SSE parser + Anthropic provider | standard | auto | ✅ done |
+| PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
+| PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
+| PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
@@ -710,6 +711,18 @@ asserts no stored UserDefaults value contains the key string; (d) `ProviderRegis
 selected provider from settings.
 **Commit:** `pa-step-7: settings store, keychain secret store, provider configuration`
 
+**Implementation notes (2026-11-06):**
+
+- **Settings persist as JSON blobs** under `settings.<name>` keys (one per setting) — simpler than
+  typed accessors and Codable-checked.
+- **Bug caught by tests:** with `@Observable`, assignments inside `init` go through the observed
+  setter and fire `didSet`, so loading wrote every default back. An `isLoading` guard fixes it.
+- **OpenAI-compatible keys are per preset** (`openAICompatible.<preset>` Keychain account) so an
+  OpenAI key is never sent to a custom or local endpoint.
+- `OpenAICompatiblePreset` and the config structs live in `Core/Settings/ProviderConfigs.swift`;
+  PA9 builds on them. `ProviderRegistry.availableIDs` hides CLI providers in the APPSTORE build.
+- The panel's length switch now also updates the saved default length.
+
 ```text
 1. Core: Settings/KeyValueStore.swift — protocol (data/string/bool get-set) with
    UserDefaultsStore (app) and InMemoryKeyValueStore (tests).
@@ -745,6 +758,20 @@ ignores thinking deltas; (e) `stop_reason: "refusal"` → `ProviderError.refused
 event → `ProviderError`; HTTP 401 → `.unauthorized`, 429 → `.rateLimited`.
 **Commit:** `pa-step-8: sse parser and anthropic messages provider`
 
+**Implementation notes (2026-11-06):**
+
+- **`max_tokens` is 16 000**, not `max(request, 4096)`: thinking can't be disabled on current
+  Claude models and counts toward `max_tokens`, so a tight cap could cut summaries off. Only
+  generated tokens are billed, and streaming removes timeout risk.
+- **`HTTPClient`** uses an ephemeral `URLSession` (no disk cache/cookies) shared by HTTP
+  providers; non-2xx bodies become `HTTPFailure` with a best-effort message parser that the
+  OpenAI-compatible provider reuses.
+- **`AnthropicProvider` takes an optional `baseURL`** (tests use unique stub hosts; also lets a
+  proxy be configured later).
+- **`StubURLProtocol`** routes by a per-test random `*.test` host, so parallel tests don't share
+  canned responses; it records request bodies (read from `httpBodyStream`).
+- `ProviderError.http` reads cleanly when there's no status code (stream `error` events).
+
 ```text
 1. Core: Net/SSEParser.swift — incremental parser over URLSession.AsyncBytes lines or raw
    chunks; emits (event, data) pairs.
@@ -778,6 +805,18 @@ configured model; (c) `data: {choices:[{delta:{content}}]}` chunks yield text in
 `GET {base}/models`.
 **Commit:** `pa-step-9: openai-compatible provider with openai, ollama, lm studio presets`
 
+**Implementation notes (2026-11-06):**
+
+- **No token cap is sent to OpenAI** (neither `max_tokens` nor `max_completion_tokens`): its
+  reasoning models reject `max_tokens` and count reasoning toward `max_completion_tokens`, so a
+  summary-sized cap can produce empty output. Local and custom servers get `max_tokens`.
+- **`NSAllowsLocalNetworking`** added to `Info.plist` so App Transport Security allows plain
+  HTTP to Ollama / LM Studio on localhost. (App Store-compatible; no review justification.)
+- **Model is required** (no guessed default model name — OpenAI's lineup changes and local
+  servers have whatever the user pulled). Settings (PA11) fills it from `listModels()`.
+- Custom endpoints get a 100 000-character budget; `content_filter` finish → `.refused`.
+- **Not verified by the session that built it:** real OpenAI / Ollama / LM Studio responses.
+
 ```text
 1. Core: Providers/OpenAICompatibleProvider.swift with OpenAICompatiblePreset (openAI, ollama,
    lmStudio, custom). inputBudget: openAI 400 000; local presets 24 000 (local models have
@@ -808,6 +847,26 @@ the override path, then `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
 the child process.
 **Commit:** `pa-step-10: claude code and codex subscription providers via cli`
 
+**Implementation notes (2026-11-06):**
+
+- **Extra Claude flags beyond the Design Decision:** `--setting-sources project` (with cwd `/`
+  there are no project settings, so none of the user's hooks, plugins, or settings load —
+  `claude --help` lists only `user`, `project`, `local` as sources) and `--effort low` for speed.
+  Still never `--bare` (it ignores the subscription login).
+- **Extra Codex flag:** `-c model_reasoning_effort="low"` for speed. Codex has no system-prompt
+  flag, so the system text leads the stdin prompt with "do not run commands or read files".
+  Codex output arrives as one `agent_message` at the end (no token streaming).
+- **Process I/O runs on dedicated threads** (stdin writer, stderr collector, stdout line reader)
+  so blocking reads never sit on Swift's cooperative pool and a large document can't deadlock the
+  pipes. Cancel → `terminate()`; a test asserts the fake child's PID is gone.
+- **A bad override path doesn't fall back** to another binary — it reports "not installed".
+- **Fake CLIs** live at `Tests/PreviewAICoreTests/Fixtures/bin/{claude,codex}` (executable bash
+  scripts) and log argv/stdin into `.build/test-scratch`.
+- **Not verified by the session that built it:** real `claude` / `codex` runs (they use the
+  owner's subscription and write to `~/.claude` / `~/.codex`). In particular, that
+  `--setting-sources project` and `--effort low` are accepted with a subscription login, and the
+  exact `codex exec --json` event names, are owner checks.
+
 ```text
 1. Core: Providers/CLIRunner.swift (#if !APPSTORE) — Process with stdin/stdout/stderr pipes,
    line-buffered stdout as AsyncThrowingStream, termination on Task cancellation, cwd "/",
@@ -829,6 +888,37 @@ attempts, stop and report — never commit red, never weaken a check to get gree
 This ends phase 3: push the branch, open the PR using the PR description template, merge when
 CI is green, then stop.
 ```
+
+### PA10.1 — Review fixes before merging phase 3 · strong · auto
+
+> **Added mid-plan 2026-11-06** — an independent read-only review of the phase 3 diff found two
+> high-severity bugs no test covered. Fixed on the phase branch before merge.
+
+**Verify:** `make verify` green, including new tests: a fake CLI that exits without reading a
+~1 MB stdin doesn't kill the process (before the fix the test runner died with signal 13); a
+fake CLI that ignores SIGTERM is gone after cancel; the OpenAI preset can't be redirected to
+another URL and keys are never sent over plain HTTP to a non-loopback host; a denied Keychain read
+produces a Keychain message (not "Add your key"); keys are read from the Keychain once; SSE
+accepts bare-CR line endings; local servers get a 300 s timeout and a "still loading" message.
+**Commit:** `pa-step-10.1: review fixes — sigpipe, per-preset urls, keychain errors, kill escalation`
+
+**Implementation notes (2026-11-06):**
+
+- **SIGPIPE crash (high):** writing a large document to a CLI that exits early raised SIGPIPE and
+  would kill PreviewAI (reproduced: test runner exited with signal 13). Fixed with
+  `F_SETNOSIGPIPE` on the stdin pipe plus `signal(SIGPIPE, SIG_IGN)` at launch.
+- **Key could reach the wrong server (high):** one shared `baseURL` meant a custom/LAN URL stayed
+  in effect after switching back to OpenAI. Base URLs are now stored per preset, OpenAI's can't
+  be overridden, and keys are only attached over HTTPS or to localhost.
+- **Cancel escalation:** SIGTERM, then SIGKILL after 1.5 s; all CLI children are killed on quit.
+- **Keychain:** reads throw on denial (`errSecAuthFailed` etc.) and the registry turns that into a
+  clear message; keys are cached in memory after the first read so a Keychain prompt can't
+  block every hotkey press. Dropped the no-op `kSecAttrAccessible` on the file-based keychain.
+- **Timeouts:** per-request (cloud 60 s, local presets 300 s — model loading can be slow);
+  `.timedOut` has its own message instead of "is it running?".
+- **SSE:** bare `\r` line endings accepted.
+- **Landmine hit while testing:** the first (crashing) run orphaned the "stubborn" fake CLI in an
+  infinite loop; it was killed by hand. Tests now terminate such children via the kill escalation.
 
 ---
 
@@ -956,6 +1046,15 @@ CI is green, then stop.
   works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
   new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
   again (ad-hoc signature changes — see Landmines).
+- [ ] **PA8–PA10 (providers)** — until the PA11 settings window lands, these can only be
+  exercised once Settings exists; then for each provider you use: Anthropic key → summary streams
+  from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →
+  summary, and with the server stopped → "Couldn't reach Ollama at localhost:11434 — is it
+  running?"; Claude subscription → `claude -p` produces a summary (confirms the CLI accepts
+  `--setting-sources project --effort low` with a subscription login); Codex subscription →
+  `codex exec` produces a summary. After a rebuild, the first use of a saved API key may show a
+  macOS Keychain prompt (ad-hoc signature changed) — "Always Allow" it; "Deny" should produce a
+  "wasn't allowed to use its Keychain item" message, not "Add your API key".
 
 ---
 
@@ -983,6 +1082,12 @@ Populated from real friction, not speculation:
 - **Swift `URL` can't hold a file-reference URL**: `URL(string: "file:///.file/id=…")` becomes
   `com-apple-unresolvable-file-reference-url:`, and bridging from `NSURL` resolves it. Resolve
   while still `NSURL` (PA6.1).
+- **`@Observable` fires `didSet` during `init`.** Unlike plain classes, observed properties
+  assigned in `init` run their observers — guard persistence while loading (PA7).
+- **SIGPIPE kills the app by default.** Any write to a child's stdin after it exits raises
+  SIGPIPE; set `F_SETNOSIGPIPE` on pipes and ignore SIGPIPE app-wide (PA10.1).
+- **A crashing test run can orphan fake CLI children.** If the test process dies mid-test, a
+  long-running fake keeps running; check `pgrep -fl Fixtures/bin` after a crash (PA10.1).
 - **Ad-hoc signatures change on every rebuild.** macOS keys Automation (TCC) grants and Keychain
   item access to the code signature, so after a rebuild expect the Finder permission prompt and
   a Keychain "allow" prompt again. Fixed properly by Developer ID signing (Later).

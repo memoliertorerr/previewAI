@@ -64,7 +64,13 @@ public enum ProviderError: LocalizedError, Equatable, Sendable {
         case .unauthorized: "The API key was rejected — check it in Settings."
         case .rateLimited: "The provider is rate-limiting requests — try again in a moment."
         case .refused: "The model declined to summarize this document."
-        case .http(let code, let message): message.isEmpty ? "The provider returned an error (HTTP \(code))." : "The provider returned an error (HTTP \(code)): \(message)"
+        case .http(let code, let message):
+            switch (code, message.isEmpty) {
+            case (0, true): "The provider returned an error."
+            case (0, false): "The provider returned an error: \(message)"
+            case (_, true): "The provider returned an error (HTTP \(code))."
+            case (_, false): "The provider returned an error (HTTP \(code)): \(message)"
+            }
         case .network(let message): message
         case .process(let message): message
         case .unavailable(let reason): reason

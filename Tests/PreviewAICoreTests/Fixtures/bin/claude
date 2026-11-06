@@ -1,0 +1,44 @@
+#!/bin/bash
+# Test double for the `claude` CLI. Records argv/stdin under $FAKE_LOG and prints canned
+# stream-json selected by $FAKE_MODE. Never calls the real CLI.
+printf '%s\n' "$@" > "$FAKE_LOG.args"
+echo $$ > "$FAKE_LOG.pid"
+case "$FAKE_MODE" in
+  early-exit)
+    # Exits without reading stdin, like a CLI rejecting an unknown flag.
+    echo "error: unknown option '--effort'" >&2
+    exit 2
+    ;;
+  stubborn)
+    # Ignores SIGTERM; only SIGKILL stops it.
+    trap '' TERM
+    echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"first "}}}'
+    while true; do sleep 0.1; done
+    ;;
+esac
+cat > "$FAKE_LOG.stdin"
+case "$FAKE_MODE" in
+  deltas)
+    echo '{"type":"system","subtype":"init","session_id":"s"}'
+    echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hidden"}}}'
+    echo '{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"**TL;DR** "}}}'
+    echo '{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"From Claude."}}}'
+    echo '{"type":"assistant","message":{"content":[{"type":"text","text":"**TL;DR** From Claude."}]}}'
+    echo '{"type":"result","subtype":"success","is_error":false,"result":"**TL;DR** From Claude."}'
+    ;;
+  result-only)
+    echo '{"type":"result","subtype":"success","is_error":false,"result":"Only the result."}'
+    ;;
+  error)
+    echo '{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key · Please run /login"}'
+    ;;
+  exit)
+    echo "starting" >&2
+    echo "fatal: something broke" >&2
+    exit 3
+    ;;
+  slow)
+    echo '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"first "}}}'
+    exec sleep 30
+    ;;
+esac

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Test double for the `codex` CLI. Records argv/stdin under $FAKE_LOG and prints canned
+# `codex exec --json` events selected by $FAKE_MODE. Never calls the real CLI.
+printf '%s\n' "$@" > "$FAKE_LOG.args"
+cat > "$FAKE_LOG.stdin"
+case "$FAKE_MODE" in
+  ok)
+    echo '{"type":"thread.started","thread_id":"t1"}'
+    echo '{"type":"turn.started"}'
+    echo '{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"thinking"}}'
+    echo '{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"**TL;DR** From Codex."}}'
+    echo '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}'
+    ;;
+  failed)
+    echo '{"type":"turn.started"}'
+    echo '{"type":"turn.failed","error":{"message":"You have hit your usage limit."}}'
+    ;;
+esac
