@@ -46,7 +46,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `SummarySession` | `Core/Session/` | One summary at a time; a generation counter discards results from superseded requests. |
 | `KeyCombo` | `Core/Hotkey/` | Shortcut as data: Codable, display string (⌃⌥⇧⌘ order), Carbon modifier mask, validity. |
 | `PanelContent`, `MarkdownBlock` | `Core/Session/` | What the panel shows for each state; Markdown split into blocks (SwiftUI `Text` only renders inline Markdown). |
-| `SummaryPanelController`, `SummaryView`, `PanelModel` | `App/SummaryPanel/` | Borderless, non-activating floating `NSPanel` (Liquid Glass on macOS 26) hosting SwiftUI. Esc/×/shortcut close it; closing calls `session.close()`. |
+| `SummaryPanelController`, `SummaryView`, `PanelModel` | `App/SummaryPanel/` | Borderless, non-activating floating `NSPanel` (Liquid Glass on macOS 26) hosting SwiftUI. Esc/×/shortcut close it; closing calls `session.close()` and releases the panel and its view, so idle memory returns to baseline. |
 | `AppleIntelligenceProvider` | `Core/Providers/` | FoundationModels (`#if canImport`, macOS 26+). Budget derived from `contextSize`; snapshots → deltas via `DeltaTracker`. |
 | `ProviderRegistry`, `UnavailableProvider` | `Core/Providers/` | Builds the selected provider; unconfigured ones explain themselves. |
 | `SSEParser`, `HTTPClient` | `Core/Net/` | Incremental SSE parsing over raw bytes; ephemeral `URLSession` wrapper; `HTTPFailure` error-body parsing. |
@@ -55,6 +55,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `ClaudeCodeProvider`, `CodexProvider`, `CLIRunner` | `Core/Providers/` (`#if !APPSTORE`) | Subscriptions via the installed CLIs. Binary discovery (override, then `~/.local/bin`, Homebrew, `/usr/local/bin`, npm/bun/volta). Child gets an extended PATH, cwd `/`, document on stdin; stdout parsed line by line (stream-json / `exec --json`); cancel terminates the child. |
 | `SettingsStore` | `Core/Settings/` | `@Observable` settings persisted as JSON in a `KeyValueStore` (UserDefaults in the app, in-memory in tests). API keys only via `SecretStore` (Keychain), per provider / per OpenAI-compatible preset. |
 | `SettingsWindowController`, `SettingsModel`, `SettingsView` | `App/Settings/` | Standard window (General / Providers) hosting SwiftUI; shortcut recorder (pauses the hotkey while recording; logic in Core `ShortcutRecorderModel`); per-provider forms; Test Connection via Core `ConnectionTester`. |
+| `LaunchAtLogin`, `LoginItemService` | `Core/Settings/` | `SMAppService.mainApp` login item, kept in sync with the setting. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants

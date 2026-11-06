@@ -12,6 +12,9 @@ struct SettingsView: View {
             ProviderSettings(model: model)
                 .tabItem { Label("Providers", systemImage: "sparkles") }
                 .tag(SettingsTab.providers)
+            AboutSettings()
+                .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
         }
         .frame(width: 560, height: 440)
     }
@@ -46,6 +49,15 @@ private struct GeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
             }
+            Section {
+                Toggle("Open PreviewAI at login", isOn: Binding(
+                    get: { model.settings.launchAtLogin },
+                    set: { model.setLaunchAtLogin($0) }
+                ))
+                if let error = model.loginItemError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
+            }
         }
         .formStyle(.grouped)
     }
@@ -63,6 +75,31 @@ private struct ShortcutRecorderButton: View {
                 .frame(minWidth: 120)
         }
         .help("Click, then press the new shortcut")
+    }
+}
+
+// MARK: - About
+
+private struct AboutSettings: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "text.page.badge.magnifyingglass")
+                .font(.system(size: 44, weight: .light))
+                .foregroundStyle(.secondary)
+            Text("PreviewAI").font(.title2.weight(.semibold))
+            Text("Version \(PreviewAIInfo.version)").foregroundStyle(.secondary)
+            Text("Select a document in Finder, press a shortcut, get a summary.")
+                .multilineTextAlignment(.center)
+            Text("No data leaves your Mac unless you choose a cloud provider. With Apple Intelligence or a local model, documents stay on this Mac.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+            Link("github.com/memoliertorerr/previewAI", destination: URL(string: "https://github.com/memoliertorerr/previewAI")!)
+                .padding(.top, 4)
+        }
+        .padding(30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Menu line for problems that shouldn't pop up the panel (e.g. the shortcut is taken).
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let shortcutLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let providerLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = makeStatusItem()
@@ -131,8 +132,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Menu
 
+    /// "Claude · claude-opus-5-5" — without building a provider (that could read the Keychain).
+    private var providerSummary: String {
+        let id = settings.selectedProvider
+        let model: String = switch id {
+        case .appleIntelligence: ""
+        case .anthropic: settings.anthropic.model
+        case .openAICompatible: settings.openAICompatible.model
+        case .claudeCode: settings.claudeCode.model
+        case .codex: settings.codex.model
+        }
+        let name = id == .openAICompatible ? settings.openAICompatible.preset.displayName : id.displayName
+        return model.isEmpty ? name : "\(name) · \(model)"
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         shortcutLine.title = "Shortcut: \(settings.shortcut.displayString)"
+        providerLine.title = "Provider: \(providerSummary)"
         if let warning = settingsModel.shortcutWarning {
             statusLine.title = "⚠︎ " + warning
             statusLine.isHidden = false
@@ -162,6 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         shortcutLine.isEnabled = false
         menu.addItem(shortcutLine)
+        providerLine.isEnabled = false
+        menu.addItem(providerLine)
 
         let file = NSMenuItem(title: "Summarize File…", action: #selector(summarizeFile), keyEquivalent: "o")
         file.target = self

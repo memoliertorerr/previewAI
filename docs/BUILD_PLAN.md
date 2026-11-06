@@ -48,7 +48,7 @@
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
 | PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ✅ done |
-| PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
+| PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ✅ done |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
 
 **Overall status:** not started. Sequence: foundation → first runnable (hotkey → panel → Apple
@@ -982,6 +982,20 @@ non-empty, single-sentence message; (c) `LaunchAtLogin` wraps `SMAppService.main
 protocol and the settings toggle calls it (mock).
 **Commit:** `pa-step-12: launch at login, error polish, idle memory`
 
+**Implementation notes (2026-11-06):**
+
+- **Launch at login** via `SMAppService.mainApp` behind `LoginItemService`; `LaunchAtLogin`
+  keeps the setting truthful (syncs from the system on open; a refusal leaves the toggle off and
+  shows macOS's reason). Tests use a mock — the real login item is never touched.
+- **Idle memory:** closing the panel now tears it down (panel and SwiftUI hosting view released,
+  session text dropped); a test asserts a closed session with a running stream deallocates.
+- **Error copy:** `ProviderError.sentence(_:)` normalizes server/CLI text (capitalized, ends with
+  punctuation); a test checks every provider and document error reads as a short sentence. It
+  caught "…(HTTP 500): boom" with no period.
+- **Menu shows "Provider: …"** built from settings without constructing a provider (which could
+  read the Keychain each time the menu opens).
+- About tab: version, privacy line, GitHub link.
+
 ```text
 1. Launch at login via SMAppService.mainApp (register/unregister), surfaced in General.
 2. Closing the panel cancels work and drops the session's text; the SwiftUI hosting view is
@@ -1068,6 +1082,10 @@ CI is green, then stop.
   ⌃⌥Space and see the macOS-shortcut warning), default length. Providers tab: picker; each
   provider's fields; API keys save to the Keychain and are never shown; Ollama "Refresh" lists
   models; "Test Connection" reports success/failure. Looks native in light and dark.
+- [ ] **PA12** — Settings → General → "Open PreviewAI at login" on → log out/in (or check System
+  Settings → General → Login Items) and PreviewAI is there; off removes it. About tab shows the
+  version and link. The menu shows "Provider: …". After closing the panel, Activity Monitor shows
+  PreviewAI's memory back near its idle level.
 - [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
   summary for each provider you use: Anthropic key → summary streams
   from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →

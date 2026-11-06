@@ -19,6 +19,8 @@ final class SettingsModel {
     var isTesting = false
     var availableModels: [String] = []
     var modelListError: String?
+    var loginItemError: String?
+    @ObservationIgnored let launchAtLogin: LaunchAtLogin
 
     /// Re-registers the global hotkey; returns false if macOS refused it.
     @ObservationIgnored var applyShortcut: ((KeyCombo) -> Bool)?
@@ -30,7 +32,12 @@ final class SettingsModel {
         self.settings = settings
         self.registry = registry
         self.recorder = ShortcutRecorderModel(combo: settings.shortcut)
-        refreshShortcutWarning()
+        self.launchAtLogin = LaunchAtLogin(settings: settings, service: SystemLoginItemService())
+        launchAtLogin.syncFromSystem()
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        loginItemError = launchAtLogin.set(enabled)
     }
 
     // MARK: Shortcut
