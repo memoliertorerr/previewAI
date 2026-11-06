@@ -183,7 +183,7 @@ private struct AnthropicForm: View {
             Picker("Model", selection: $model.settings.anthropic.model) {
                 ForEach(AnthropicConfig.models, id: \.self) { Text($0).tag($0) }
             }
-            Text("Opus is the most capable; Haiku is the fastest and cheapest. Keys: console.anthropic.com.")
+            Text("Opus is the most capable; Haiku is the fastest and cheapest. Keys: platform.claude.com.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

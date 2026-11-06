@@ -1036,8 +1036,11 @@ GitHub Release (the agent does not publish releases).
   silently stop working in a signed release.
 - **Added `scripts/release.sh`** (sign with hardened runtime + entitlements, notarize via a
   `notarytool` keychain profile, staple, zip, `spctl` assess) and
-  `Resources/PreviewAI-AppStore.entitlements` for the future App Store target. Both are
-  **untested** — they need the owner's Developer ID certificate / account. `bash -n` passes.
+  `Resources/PreviewAI-AppStore.entitlements` for the future App Store target. Both were
+  untested at the time — they needed the owner's Developer ID certificate / account. **Update
+  2026-11-06:** the owner ran `release.sh`; the resulting app is Developer ID–signed, notarized,
+  stapled, and accepted by `spctl` (see DISTRIBUTION.md). The App Store entitlements remain
+  untested.
 - `make dist` existed since PA1; verified the zipped app (1.6 MB, zip 428 KB) passes
   `codesign --verify --deep` after unzipping.
 - README rewritten for users (providers table, entry points, privacy); ARCHITECTURE and AGENTS
@@ -1157,10 +1160,11 @@ descriptive labels and the Settings notices.
   Settings → General → Login Items) and PreviewAI is there; off removes it. About tab shows the
   version and link. The menu shows "Provider: …". After closing the panel, Activity Monitor shows
   PreviewAI's memory back near its idle level.
-- [ ] **PA13** — read README.md and docs/DISTRIBUTION.md for accuracy. When ready to ship:
-  run `scripts/release.sh "Developer ID Application: … (TEAMID)" <profile>` (one-time setup in
-  DISTRIBUTION.md), confirm the notarized app opens without a Gatekeeper warning on another Mac,
-  and decide whether to publish a GitHub Release (the agent doesn't publish releases).
+- [ ] **PA13** — read README.md and docs/DISTRIBUTION.md for accuracy. ✅ Done 2026-11-06:
+  `scripts/release.sh` signed + notarized v0.1.0 (`dist/PreviewAI-0.1.0.zip`, verified with
+  `stapler validate` and `spctl`). Still to do: confirm it opens without a Gatekeeper warning on
+  another Mac, accept Anthropic's Commercial Terms (PROVIDER_TERMS.md → Owner actions), and decide
+  whether to publish a GitHub Release (the agent doesn't publish releases).
 - [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
   summary for each provider you use: Anthropic key → summary streams
   from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →
@@ -1214,7 +1218,7 @@ Populated from real friction, not speculation:
 | Item | Design | What it needs |
 |---|---|---|
 | **Sign in with ChatGPT** | Replace the Codex CLI route with OpenAI's official SIWC program for third-party apps (open-source apps eligible; paid apps via interest form) | Register an OAuth client with OpenAI; implement the SIWC flow |
-| **Developer ID + notarization** | `codesign --options runtime` with a Developer ID cert; `notarytool` in a `make release` target; optional CI job with secrets | Owner's certificate and an app-specific password / API key in the keychain or CI secrets |
+| **Release in CI** | `scripts/release.sh` works locally (v0.1.0 notarized 2026-11-06); optionally run it from a tagged-release CI job | Developer ID cert + notary API key as CI secrets |
 | **Mac App Store build** | Xcode project wrapping the same sources; `APPSTORE` flag; sandbox entitlements; Finder Action extension (appex) as the entry point; Apple Intelligence, API-key and local providers only | Xcode project, appex target, App Store Connect record, review notes |
 | **Long-document mode** | Map-reduce: chunk by budget, summarize chunks in parallel, then summarize the summaries | Chunker + session progress UI |
 | **Follow-up questions** | Text field under the summary; keeps the document text for the session | Multi-turn request shape per provider |

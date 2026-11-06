@@ -8,12 +8,13 @@ PreviewAI ships two ways from the same sources:
 | Finder-selection shortcut | ✅ (Apple Events) | ❌ — use the Finder Service instead |
 | Claude Code CLI / Codex CLI providers | ✅ free build (see `PROVIDER_TERMS.md`) | ❌ — sandboxed apps can't run them |
 | Apple Intelligence, API keys, local servers | ✅ | ✅ |
-| Status | Script written, **untested** until run with your certificate | Planned (see **Later** in BUILD_PLAN.md) |
+| Status | ✅ Working — v0.1.0 signed, notarized and stapled (2026-11-06) | Planned (see **Later** in BUILD_PLAN.md) |
 
-> **What has been verified:** `make dist` produces an ad-hoc-signed zip whose app passes
-> `codesign --verify --deep`, and the APPSTORE variant compiles with no Apple Events or `Process`
-> code in its binary. **Not verified:** Developer ID signing, notarization, stapling, and anything
-> App Store — they need your Apple Developer account.
+> **What has been verified:** `scripts/release.sh` produced `dist/PreviewAI-0.1.0.zip` on
+> 2026-11-06; the app inside passes `codesign --verify --deep --strict` (Developer ID, hardened
+> runtime, secure timestamp), `xcrun stapler validate`, and `spctl` ("Notarized Developer ID").
+> `make dist` (ad-hoc) and the APPSTORE variant (no Apple Events or `Process` code) also check out.
+> **Not verified:** a first launch on a *different* Mac, and anything App Store.
 
 ## Direct download: Developer ID + notarization
 
