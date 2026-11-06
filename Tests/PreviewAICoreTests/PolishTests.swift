@@ -4,15 +4,21 @@ import Testing
 
 @MainActor
 final class MockLoginItemService: LoginItemService {
-    var isEnabled = false
+    var status: LoginItemStatus = .disabled
     var failure: Error?
+    var needsApproval = false
     var calls: [Bool] = []
+    var openedSettings = 0
+
+    var isEnabled: Bool { status == .enabled }
 
     func setEnabled(_ enabled: Bool) throws {
         calls.append(enabled)
         if let failure { throw failure }
-        isEnabled = enabled
+        status = enabled ? (needsApproval ? .requiresApproval : .enabled) : .disabled
     }
+
+    func openApprovalSettings() { openedSettings += 1 }
 }
 
 @MainActor
@@ -43,9 +49,19 @@ final class MockLoginItemService: LoginItemService {
     @Test func syncFollowsTheSystem() {
         let (launch, settings, service) = make()
         settings.launchAtLogin = true
-        service.isEnabled = false  // user removed it in System Settings
+        service.status = .disabled  // user removed it in System Settings
         launch.syncFromSystem()
         #expect(!settings.launchAtLogin)
+    }
+
+    @Test func approvalNeededIsExplainedNotSilentlyReverted() {
+        let (launch, settings, service) = make()
+        service.needsApproval = true
+        let message = launch.set(true)
+        #expect(message?.contains("Login Items") == true)
+        #expect(settings.launchAtLogin)  // registered, waiting for approval — not silently off
+        #expect(service.openedSettings == 1)
+        #expect(launch.approvalMessage != nil)
     }
 }
 

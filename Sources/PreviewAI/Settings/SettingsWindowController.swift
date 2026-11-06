@@ -17,6 +17,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         if let tab { model.tab = tab }
         let window = window ?? makeWindow()
         self.window = window
+        model.recordingWindow = window
+        model.windowWillShow()
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
@@ -37,8 +39,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         return window
     }
 
+    /// Switching away mid-recording must not leave the global hotkey paused.
+    func windowDidResignKey(_ notification: Notification) {
+        model.endShortcutRecording()
+    }
+
     func windowWillClose(_ notification: Notification) {
         model.endShortcutRecording()
+        model.clearProviderFeedback()
         // Hand focus back to whatever the user was using (usually Finder).
         NSApp.deactivate()
     }

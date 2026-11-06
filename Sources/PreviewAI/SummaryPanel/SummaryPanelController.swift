@@ -42,7 +42,9 @@ final class SummaryPanelController {
         guard let panel else { return }
         self.panel = nil
         panel.orderOut(nil)
-        panel.contentView = nil
+        // close() often runs inside the panel's own event handling (a button, Esc), so free its
+        // views on the next turn of the run loop, not while they're on the stack.
+        DispatchQueue.main.async { panel.contentView = nil }
     }
 
     private func makePanel() -> SummaryPanel {

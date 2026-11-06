@@ -23,8 +23,10 @@ Reads PDF, Markdown, plain text (including source code), RTF/RTFD, Word (.docx) 
 ## Install
 
 1. Download `PreviewAI-<version>.zip` (or build it — see below), unzip, and move
-   **PreviewAI.app** to `/Applications`.
-2. Builds that aren't Developer ID-signed need a right-click → **Open** the first time.
+   **PreviewAI.app** to `/Applications` (running it from Downloads can break "Open at login").
+2. Builds that aren't notarized are blocked the first time. On macOS 15 and later: try to open
+   it, then go to System Settings → Privacy & Security and click **Open Anyway**. (On macOS 14,
+   right-click the app → **Open**.) Notarized releases open normally.
 3. PreviewAI appears as an icon in the menu bar. Open **Settings…** from it to pick a provider.
 
 ## Ways to summarize

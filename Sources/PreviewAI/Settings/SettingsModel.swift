@@ -27,6 +27,9 @@ final class SettingsModel {
     /// Pauses the global hotkey while recording, so pressing the current combo is recordable.
     @ObservationIgnored var setHotkeyPaused: ((Bool) -> Void)?
     @ObservationIgnored private var keyMonitor: Any?
+    /// Only key presses in this window are recorded; others pass through untouched.
+    @ObservationIgnored weak var recordingWindow: NSWindow?
+    @ObservationIgnored private var testTask: Task<Void, Never>?
 
     init(settings: SettingsStore, registry: ProviderRegistry) {
         self.settings = settings
@@ -40,6 +43,12 @@ final class SettingsModel {
         loginItemError = launchAtLogin.set(enabled)
     }
 
+    /// Called whenever the window opens, so toggles reflect changes made in System Settings.
+    func windowWillShow() {
+        launchAtLogin.syncFromSystem()
+        loginItemError = launchAtLogin.approvalMessage
+    }
+
     // MARK: Shortcut
 
     func beginShortcutRecording() {
@@ -47,7 +56,7 @@ final class SettingsModel {
         recorder.start()
         setHotkeyPaused?(true)
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
+            guard let self, event.window === self.recordingWindow else { return event }
             let outcome = self.recorder.handle(keyCode: event.keyCode, modifierFlags: event.modifierFlags.rawValue)
             switch outcome {
             case .ignored:
@@ -76,12 +85,14 @@ final class SettingsModel {
         refreshShortcutWarning()
     }
 
+    /// Registers the saved shortcut (always — also at launch), then explains any problem.
     func refreshShortcutWarning() {
         let combo = settings.shortcut
-        if HotkeyManager.isReservedBySystem(combo) {
-            shortcutWarning = "\(combo.displayString) is also a macOS shortcut, so it may not reach PreviewAI. Choose another, or turn that one off in System Settings → Keyboard → Keyboard Shortcuts."
-        } else if applyShortcut?(combo) == false {
+        let registered = applyShortcut?(combo) ?? true
+        if !registered {
             shortcutWarning = "\(combo.displayString) is already used by another app. Choose another shortcut."
+        } else if HotkeyManager.isReservedBySystem(combo) {
+            shortcutWarning = "\(combo.displayString) is also a macOS shortcut, so it may not reach PreviewAI. Choose another, or turn that one off in System Settings → Keyboard → Keyboard Shortcuts."
         } else {
             shortcutWarning = nil
         }
@@ -90,11 +101,13 @@ final class SettingsModel {
     // MARK: Providers
 
     func testConnection() {
+        testTask?.cancel()
         isTesting = true
         testResult = nil
         let provider = registry.current
-        Task {
+        testTask = Task {
             let result = await ConnectionTester.run(provider)
+            guard !Task.isCancelled else { return }
             self.testResult = result
             self.isTesting = false
         }
@@ -116,6 +129,9 @@ final class SettingsModel {
     }
 
     func clearProviderFeedback() {
+        testTask?.cancel()
+        testTask = nil
+        isTesting = false
         testResult = nil
         availableModels = []
         modelListError = nil

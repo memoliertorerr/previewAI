@@ -50,8 +50,9 @@
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ✅ done |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ✅ done |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ✅ done |
+| PA13.1 | Review fixes before merging phase 4 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 
-**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1 and PA10.1).
+**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1, PA10.1 and PA13.1).
 What remains is the owner's **Pending human checks** (UI, permissions, real providers) and the
 **Later** items (Developer ID release, App Store build, long-document mode, …). Sequence: foundation → first runnable (hotkey → panel → Apple
 Intelligence) → remaining providers → settings + ship.
@@ -1063,6 +1064,33 @@ This ends phase 4: push the branch, open the PR using the PR description templat
 CI is green, then stop.
 ```
 
+### PA13.1 — Review fixes before merging phase 4 · strong · check
+
+> **Added mid-plan 2026-11-06** — an independent read-only review of the phase 4 diff.
+
+**Verify:** `make verify` green (120 tests), including: a denied Keychain read is remembered (no
+repeated prompts) until the key is saved again; "Open at login" needing approval stays on with an
+explanation and opens Login Items.
+**Commit:** `pa-step-13.1: review fixes — paste in settings, keychain re-prompts, recorder, teardown`
+
+**Implementation notes (2026-11-06):**
+
+- **⌘V didn't paste** into Settings fields: an accessory app only gets editing shortcuts from
+  main-menu key equivalents, and the hidden Edit menu lacked Paste/Cut/Undo/Redo. Added.
+- **Keychain denial is cached** so SwiftUI re-renders (every keystroke) can't re-trigger the
+  system prompt; saving the key clears it.
+- **The saved shortcut is always registered at launch**, even when it clashes with a macOS
+  shortcut (previously the clash check skipped registration).
+- **Recording ends when the Settings window loses focus**, and the key monitor only records keys
+  aimed at the Settings window — the summary panel's keys pass through.
+- **Panel teardown is deferred** to the next run-loop turn, since `close()` usually runs inside
+  the panel's own button/Esc handling.
+- **Login item `requiresApproval`** is a distinct state: the toggle stays on, a message explains,
+  and System Settings → Login Items opens. Synced each time Settings opens.
+- **Test Connection** keeps its task and cancels it when the provider changes or the window closes.
+- **README:** macOS 15+ needs System Settings → Privacy & Security → **Open Anyway** for
+  un-notarized apps (right-click → Open no longer works); run from /Applications.
+
 ---
 
 ## Pending human checks
@@ -1094,7 +1122,7 @@ CI is green, then stop.
   works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
   new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
   again (ad-hoc signature changes — see Landmines).
-- [ ] **PA11** — open Settings from the menu: General tab (click the shortcut, press a new one;
+- [ ] **PA11 / PA13.1** — paste an API key with ⌘V into a Settings field (and ⌘X/⌘Z work). Open Settings from the menu: General tab (click the shortcut, press a new one;
   the old one stops working and the new one works; Esc cancels; Delete resets to ⌥⇧Space; try
   ⌃⌥Space and see the macOS-shortcut warning), default length. Providers tab: picker; each
   provider's fields; API keys save to the Keychain and are never shown; Ollama "Refresh" lists
