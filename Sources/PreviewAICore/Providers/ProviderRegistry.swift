@@ -26,6 +26,8 @@ public final class ProviderRegistry {
         switch id {
         case .appleIntelligence:
             AppleIntelligenceProvider()
+        case .anthropic:
+            AnthropicProvider(apiKey: settings.apiKey(for: .anthropic), model: settings.anthropic.model)
         default:
             UnavailableProvider(id: id, reason: "\(id.displayName) isn't set up yet.")
         }

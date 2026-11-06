@@ -43,7 +43,7 @@
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ✅ done |
 | PA6.1 | Review fixes before merging phase 2 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ✅ done |
-| PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
+| PA8 | SSE parser + Anthropic provider | standard | auto | ✅ done |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ⬜ todo |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
@@ -756,6 +756,20 @@ and **no** `temperature`/`top_p`/`top_k`/`thinking`; (c) for `claude-opus-5-5` t
 ignores thinking deltas; (e) `stop_reason: "refusal"` → `ProviderError.refused`; an `error`
 event → `ProviderError`; HTTP 401 → `.unauthorized`, 429 → `.rateLimited`.
 **Commit:** `pa-step-8: sse parser and anthropic messages provider`
+
+**Implementation notes (2026-11-06):**
+
+- **`max_tokens` is 16 000**, not `max(request, 4096)`: thinking can't be disabled on current
+  Claude models and counts toward `max_tokens`, so a tight cap could cut summaries off. Only
+  generated tokens are billed, and streaming removes timeout risk.
+- **`HTTPClient`** uses an ephemeral `URLSession` (no disk cache/cookies) shared by HTTP
+  providers; non-2xx bodies become `HTTPFailure` with a best-effort message parser that the
+  OpenAI-compatible provider reuses.
+- **`AnthropicProvider` takes an optional `baseURL`** (tests use unique stub hosts; also lets a
+  proxy be configured later).
+- **`StubURLProtocol`** routes by a per-test random `*.test` host, so parallel tests don't share
+  canned responses; it records request bodies (read from `httpBodyStream`).
+- `ProviderError.http` reads cleanly when there's no status code (stream `error` events).
 
 ```text
 1. Core: Net/SSEParser.swift — incremental parser over URLSession.AsyncBytes lines or raw
