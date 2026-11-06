@@ -1,4 +1,5 @@
 import Carbon.HIToolbox
+import Foundation
 import PreviewAICore
 
 /// One global hotkey via Carbon `RegisterEventHotKey` — no Accessibility permission needed,
@@ -35,6 +36,24 @@ final class HotkeyManager {
         }
         self.combo = combo
         return true
+    }
+
+    /// True if an enabled macOS shortcut (System Settings → Keyboard → Keyboard Shortcuts) uses
+    /// this combo. macOS handles those first, so our hotkey would never fire — and
+    /// `RegisterEventHotKey` doesn't report the clash.
+    static func isReservedBySystem(_ combo: KeyCombo) -> Bool {
+        var unmanaged: Unmanaged<CFArray>?
+        guard CopySymbolicHotKeys(&unmanaged) == noErr, let array = unmanaged?.takeRetainedValue() as? [[String: Any]] else {
+            return false
+        }
+        let relevant: UInt32 = UInt32(cmdKey | shiftKey | optionKey | controlKey)
+        return array.contains { entry in
+            guard (entry[kHISymbolicHotKeyEnabled as String] as? Bool) == true,
+                  let code = (entry[kHISymbolicHotKeyCode as String] as? NSNumber)?.uint32Value,
+                  let mods = (entry[kHISymbolicHotKeyModifiers as String] as? NSNumber)?.uint32Value
+            else { return false }
+            return code == combo.keyCode && (mods & relevant) == combo.carbonModifiers
+        }
     }
 
     func unregister() {

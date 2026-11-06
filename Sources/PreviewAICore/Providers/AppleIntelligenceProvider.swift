@@ -85,7 +85,7 @@ public struct AppleIntelligenceProvider: SummaryProvider {
     static func map(_ error: LanguageModelSession.GenerationError) -> ProviderError {
         switch error {
         case .exceededContextWindowSize:
-            .unavailable("This document is too long for Apple Intelligence. Choose a cloud or local provider in Settings for long documents.")
+            .contextTooLong
         case .guardrailViolation, .refusal:
             .refused
         case .unsupportedLanguageOrLocale:

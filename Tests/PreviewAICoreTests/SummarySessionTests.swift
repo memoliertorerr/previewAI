@@ -126,6 +126,32 @@ import Testing
         #expect(provider.calls[0].user.contains("Only the first 10%"))
     }
 
+    @Test func contextOverflowRetriesOnceWithLessText() async throws {
+        let url = try TestSupport.scratch().appendingPathComponent("cjk.txt")
+        try String(repeating: "漢字かな交じり文 ", count: 600).write(to: url, atomically: true, encoding: .utf8)
+        let session = SummarySession()
+        // Budget says 5 400 chars fit, but the "model" only takes ~2 500 (dense script).
+        let provider = ScriptedProvider(inputBudget: 5_400, chunks: ["ok"], maxPromptCharacters: 2_500)
+        session.summarize(url: url, provider: provider, length: .brief)
+        await session.waitUntilSettled()
+        guard case .finished(let info, let text) = session.state else { Issue.record("\(session.state)"); return }
+        #expect(text == "ok")
+        #expect(info.truncationNote != nil)
+        #expect(provider.calls.count == 2)
+        #expect(!session.failureNeedsSettings)
+    }
+
+    @Test func contextOverflowGivesUpAfterOneRetry() async throws {
+        let session = SummarySession()
+        let provider = ScriptedProvider(chunks: ["ok"], maxPromptCharacters: 10)
+        session.summarize(url: TestSupport.fixture("sample.md"), provider: provider, length: .brief)
+        await session.waitUntilSettled()
+        guard case .failed(_, let message) = session.state else { Issue.record("\(session.state)"); return }
+        #expect(message == ProviderError.contextTooLong.localizedDescription)
+        #expect(provider.calls.count == 2)
+        #expect(!session.failureNeedsSettings)
+    }
+
     @Test func closeForgetsLastRequest() async {
         let session = SummarySession()
         let provider = ScriptedProvider(chunks: ["x"])

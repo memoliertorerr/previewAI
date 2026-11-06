@@ -18,7 +18,7 @@ Supports PDF, Markdown, plain text, RTF, Word (.docx) and HTML.
 
 ## Ways to summarize
 
-- **Shortcut** — select a document in Finder and press **⌃⌥Space**. The first time, macOS asks
+- **Shortcut** — select a document in Finder and press **⌥⇧Space**. The first time, macOS asks
   whether PreviewAI may control Finder (that's how it learns which file is selected).
 - **Finder Service** — right-click a document → Quick Actions / Services → **Summarize with
   PreviewAI**. You can give it its own shortcut in System Settings → Keyboard → Keyboard

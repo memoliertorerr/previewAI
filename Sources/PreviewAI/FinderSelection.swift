@@ -14,13 +14,17 @@ enum FinderSelection {
     }
 
     private static let finderBundleID = "com.apple.finder"
+    // Returns a list (not a joined string, so newlines in names are safe). Items that can't
+    // be coerced to a file alias are skipped instead of failing the whole selection.
     private static let source = """
     tell application "Finder"
-        set output to ""
+        set thePaths to {}
         repeat with anItem in (get selection)
-            set output to output & POSIX path of (anItem as alias) & linefeed
+            try
+                set end of thePaths to POSIX path of (anItem as alias)
+            end try
         end repeat
-        return output
+        return thePaths
     end tell
     """
     private static var script: NSAppleScript?
@@ -34,13 +38,21 @@ enum FinderSelection {
         let output = script?.executeAndReturnError(&error)
         if let error {
             let code = error[NSAppleScript.errorNumber] as? Int
+            switch code {
             // errAEEventNotPermitted: the user denied (or hasn't granted) Automation access.
-            if code == -1743 { return .permissionDenied }
-            return .failed(error[NSAppleScript.errorMessage] as? String ?? "Finder didn't respond.")
+            case -1743: return .permissionDenied
+            // errAETimeout: usually the first-run permission prompt was left unanswered.
+            case -1712: return .failed("Finder didn't answer in time. If macOS asked for permission, allow it and try again.")
+            default: return .failed("Couldn't read Finder's selection. Try selecting the file again.")
+            }
         }
-        let paths = (output?.stringValue ?? "")
-            .split(separator: "\n")
-            .map { URL(fileURLWithPath: String($0)) }
+        guard let output else { return .empty }
+        var paths: [URL] = []
+        if output.numberOfItems > 0 {
+            for index in 1...output.numberOfItems {  // Apple Event lists are 1-based
+                if let path = output.atIndex(index)?.stringValue { paths.append(URL(fileURLWithPath: path)) }
+            }
+        }
         return paths.isEmpty ? .empty : .files(paths)
     }
 }

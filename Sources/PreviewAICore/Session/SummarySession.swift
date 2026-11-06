@@ -68,7 +68,8 @@ public final class SummarySession {
         providerLabel = provider.modelName.isEmpty ? provider.displayName : "\(provider.displayName) · \(provider.modelName)"
         state = .loading(DocumentInfo(url: url))
         task = Task { [weak self] in
-            await self?.run(url: url, provider: provider, length: length, useCache: useCache, generation: current)
+            await self?.run(url: url, provider: provider, length: length, useCache: useCache,
+                            budget: provider.inputBudget, isRetry: false, generation: current)
         }
     }
 
@@ -104,7 +105,12 @@ public final class SummarySession {
         await task?.value
     }
 
-    private func run(url: URL, provider: any SummaryProvider, length: SummaryLength, useCache: Bool, generation current: Int) async {
+    /// Divisor applied to the budget when a provider reports its context overflowed — covers
+    /// scripts that use far more tokens per character than the budget assumes (e.g. CJK).
+    static let contextRetryDivisor = 3
+
+    private func run(url: URL, provider: any SummaryProvider, length: SummaryLength, useCache: Bool,
+                     budget: Int, isRetry: Bool, generation current: Int) async {
         var info = DocumentInfo(url: url)
 
         if case .unavailable(let reason) = await provider.availability() {
@@ -114,7 +120,7 @@ public final class SummarySession {
 
         let document: DocumentContent
         do {
-            document = try await loader.load(url).budgeted(maxCharacters: provider.inputBudget)
+            document = try await loader.load(url).budgeted(maxCharacters: budget)
         } catch {
             finish(.failed(info, error.localizedDescription), generation: current)
             return
@@ -141,6 +147,12 @@ public final class SummarySession {
                 state = .streaming(info, text)
             }
         } catch is CancellationError {
+            return
+        } catch ProviderError.contextTooLong where !isRetry && text.isEmpty {
+            guard current == generation else { return }
+            await run(url: url, provider: provider, length: length, useCache: useCache,
+                      budget: max(1, min(budget, document.text.count) / Self.contextRetryDivisor),
+                      isRetry: true, generation: current)
             return
         } catch {
             let needsSettings: Bool = switch error as? ProviderError {

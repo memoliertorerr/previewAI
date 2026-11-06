@@ -69,19 +69,22 @@ final class SummaryPanelController {
     /// Liquid Glass on macOS 26, a vibrant popover material before that.
     private static func backgroundView(containing content: NSView) -> NSView {
         let radius: CGFloat = 18
+        let frame = NSRect(origin: .zero, size: defaultSize)
         if #available(macOS 26, *) {
-            let glass = NSGlassEffectView()
+            let glass = NSGlassEffectView(frame: frame)
             glass.cornerRadius = radius
+            // Don't rely on the glass view to size its content.
+            content.frame = glass.bounds
+            content.autoresizingMask = [.width, .height]
             glass.contentView = content
             return glass
         }
-        let effect = NSVisualEffectView()
+        let effect = NSVisualEffectView(frame: frame)
         effect.material = .popover
         effect.blendingMode = .behindWindow
         effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = radius
-        effect.layer?.masksToBounds = true
+        // A layer corner radius doesn't clip a behind-window blur; a mask image does.
+        effect.maskImage = roundedMask(radius: radius)
         content.translatesAutoresizingMaskIntoConstraints = false
         effect.addSubview(content)
         NSLayoutConstraint.activate([
@@ -91,6 +94,18 @@ final class SummaryPanelController {
             content.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
         ])
         return effect
+    }
+
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 
     /// Centered (slightly high, like Quick Look) on the screen that has the mouse.

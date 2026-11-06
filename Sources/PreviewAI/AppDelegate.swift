@@ -18,8 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = makeStatusItem()
 
         hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
-        if !hotkey.register(.default) {
-            showInMenu("Shortcut \(KeyCombo.default.displayString) is taken by another app")
+        let combo = KeyCombo.default
+        if HotkeyManager.isReservedBySystem(combo) {
+            showInMenu("\(combo.displayString) is also a macOS shortcut — change one of them")
+        }
+        if !hotkey.register(combo) {
+            showInMenu("Shortcut \(combo.displayString) is taken by another app")
         }
 
         panelModel.onOpenSettings = { [weak self] in self?.openProviderSettings() }
@@ -37,17 +41,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Entry points
 
     private func hotkeyPressed() {
-        // Like Space in Quick Look: the shortcut toggles the panel.
-        if panel.isVisible {
-            panel.close()
+        // Like Space in Quick Look: the shortcut closes the panel — unless the Finder
+        // selection changed, in which case it summarizes the new file.
+        guard panel.isVisible else {
+            summarizeFinderSelection()
             return
         }
-        summarizeFinderSelection()
+        #if !APPSTORE
+        if case .files(let urls) = FinderSelection.current(),
+           let first = EntryPoint.resolveFiles(urls).first,
+           first.standardizedFileURL != panelModel.content.fileURL?.standardizedFileURL {
+            handle(files: urls)
+            return
+        }
+        #endif
+        panel.close()
     }
 
     private func summarizeFinderSelection() {
         #if APPSTORE
-        showInPanel("Right-click a document in Finder → Quick Actions → Summarize with PreviewAI.")
+        showInPanel("Right-click a document in Finder → Services → Summarize with PreviewAI.")
         #else
         switch FinderSelection.current() {
         case .files(let urls): handle(files: urls)
@@ -69,7 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = Self.supportedTypes
         panel.message = "Choose a document to summarize"
-        guard panel.runModal() == .OK else { return }
+        let response = panel.runModal()
+        // Give focus back to the previous app (usually Finder) so the shortcut keeps working.
+        NSApp.deactivate()
+        guard response == .OK else { return }
         handle(files: panel.urls)
     }
 

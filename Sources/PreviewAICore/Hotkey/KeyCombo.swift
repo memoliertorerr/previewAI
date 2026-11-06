@@ -20,8 +20,8 @@ public struct KeyCombo: Codable, Hashable, Sendable {
         self.modifiers = modifiers
     }
 
-    /// ⌃⌥Space.
-    public static let `default` = KeyCombo(keyCode: KeyCode.space, modifiers: [.control, .option])
+    /// ⌥⇧Space. (⌃Space and ⌃⌥Space are macOS input-source shortcuts.)
+    public static let `default` = KeyCombo(keyCode: KeyCode.space, modifiers: [.option, .shift])
 
     /// Builds a combo from an `NSEvent` key code and `NSEvent.ModifierFlags.rawValue`.
     /// Returns nil when the result isn't usable as a global shortcut.

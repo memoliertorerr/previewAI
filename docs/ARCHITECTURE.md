@@ -30,7 +30,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 
 | Path | Code | Variant | Notes |
 |---|---|---|---|
-| Global shortcut (default ⌃⌥Space) | `HotkeyManager` (Carbon `RegisterEventHotKey`) → `FinderSelection` | direct | Asks Finder for its selection via Apple Events, only when Finder is frontmost. First use triggers the macOS Automation prompt. In the APPSTORE build the shortcut shows a hint to use the Service. |
+| Global shortcut (default ⌥⇧Space) | `HotkeyManager` (Carbon `RegisterEventHotKey`) → `FinderSelection` | direct | Asks Finder for its selection via Apple Events, only when Finder is frontmost. First use triggers the macOS Automation prompt. In the APPSTORE build the shortcut shows a hint to use the Service. |
 | Service "Summarize with PreviewAI" | `ServiceProvider` + `NSServices` in `Info.plist` | both | Finder → right-click → Quick Actions/Services. Bindable to a shortcut in System Settings → Keyboard → Keyboard Shortcuts → Services. Limited to supported document types. |
 | Open With / drop on app icon | `application(_:open:)` + `CFBundleDocumentTypes` (Viewer, Alternate rank) | both | |
 | Summarize File… (⌘O in the menu) | `NSOpenPanel` | both | |
