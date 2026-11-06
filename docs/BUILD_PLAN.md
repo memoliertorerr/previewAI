@@ -36,7 +36,7 @@
 | Step | Scope | Model | Gate | Status |
 |------|-------|-------|------|--------|
 | PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ✅ done |
-| PA2 | Document loading + per-provider text budgets | strong | auto | ⬜ todo |
+| PA2 | Document loading + per-provider text budgets | strong | auto | ✅ done |
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ⬜ todo |
 | PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ⬜ todo |
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ⬜ todo |
@@ -345,6 +345,15 @@ RTF and an HTML fixture load as plain text; (d) an unsupported file (`.png`) thr
 (f) `budgeted(maxCharacters:)` on a 10 000-char doc with budget 4 000 returns 4 000 chars cut at
 a whitespace/paragraph boundary, `isTruncated == true`, `fractionIncluded ≈ 0.4`.
 **Commit:** `pa-step-2: document loader for pdf/md/txt/rtf/docx/html with budgets`
+
+**Implementation notes (2026-11-06):**
+
+- **HTML loads on the main actor**: the `NSAttributedString` HTML importer is WebKit-backed and
+  documented as main-thread only. Other kinds extract in a detached task.
+- **Budget cut rule:** prefer a paragraph break within the last 20% of the window, otherwise
+  the last whitespace — keeps truncation from discarding most of the budget on one early break.
+- Added a DOCX test (generated with `NSAttributedString` `.officeOpenXML` export) and a
+  paragraph-boundary test beyond the Verify list.
 
 ```text
 Build the document layer in Sources/PreviewAICore/Document/.
