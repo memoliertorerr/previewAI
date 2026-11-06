@@ -60,22 +60,31 @@ public enum ProviderError: LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .notConfigured(let what): "\(what) Open Settings to finish setup."
+        case .notConfigured(let what): "\(Self.sentence(what)) Open Settings to finish setup."
         case .unauthorized: "The API key was rejected — check it in Settings."
         case .rateLimited: "The provider is rate-limiting requests — try again in a moment."
         case .refused: "The model declined to summarize this document."
         case .http(let code, let message):
             switch (code, message.isEmpty) {
             case (0, true): "The provider returned an error."
-            case (0, false): "The provider returned an error: \(message)"
+            case (0, false): Self.sentence("The provider returned an error: \(message)")
             case (_, true): "The provider returned an error (HTTP \(code))."
-            case (_, false): "The provider returned an error (HTTP \(code)): \(message)"
+            case (_, false): Self.sentence("The provider returned an error (HTTP \(code)): \(message)")
             }
-        case .network(let message): message
-        case .process(let message): message
-        case .unavailable(let reason): reason
+        case .network(let message): Self.sentence(message)
+        case .process(let message): Self.sentence(message)
+        case .unavailable(let reason): Self.sentence(reason)
         case .emptyResponse: "The model returned an empty summary — try again."
         case .contextTooLong: "This document is too long for the selected model. Choose a provider with a larger context in Settings."
         }
+    }
+
+    /// Server and CLI text arrives without consistent punctuation; make it read as a sentence.
+    static func sentence(_ text: String) -> String {
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let last = trimmed.last else { return trimmed }
+        if !".!?”)".contains(last) { trimmed += "." }
+        if let first = trimmed.first, first.isLowercase { trimmed = first.uppercased() + trimmed.dropFirst() }
+        return trimmed
     }
 }

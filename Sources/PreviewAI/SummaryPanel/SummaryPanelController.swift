@@ -35,9 +35,16 @@ final class SummaryPanelController {
         panel.makeKeyAndOrderFront(nil)
     }
 
+    /// Closing tears the panel down completely, so an idle app holds no view hierarchy or
+    /// summary text. Re-creating it on the next show takes a few milliseconds.
     func close() {
-        panel?.orderOut(nil)
         model.session.close()
+        guard let panel else { return }
+        self.panel = nil
+        panel.orderOut(nil)
+        // close() often runs inside the panel's own event handling (a button, Esc), so free its
+        // views on the next turn of the run loop, not while they're on the stack.
+        DispatchQueue.main.async { panel.contentView = nil }
     }
 
     private func makePanel() -> SummaryPanel {

@@ -47,11 +47,14 @@
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ✅ done |
 | PA10.1 | Review fixes before merging phase 3 *(added mid-plan 2026-11-06)* | strong | auto | ✅ done |
-| PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
-| PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
-| PA13 | Docs, `make dist`, distribution guide | standard | check | ⬜ todo |
+| PA11 | Settings window + shortcut recorder + Test connection | strong | check | ✅ done |
+| PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ✅ done |
+| PA13 | Docs, `make dist`, distribution guide | standard | check | ✅ done |
+| PA13.1 | Review fixes before merging phase 4 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 
-**Overall status:** not started. Sequence: foundation → first runnable (hotkey → panel → Apple
+**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1, PA10.1 and PA13.1).
+What remains is the owner's **Pending human checks** (UI, permissions, real providers) and the
+**Later** items (Developer ID release, App Store build, long-document mode, …). Sequence: foundation → first runnable (hotkey → panel → Apple
 Intelligence) → remaining providers → settings + ship.
 
 **Model note:** Phases 1, 2 and 4's settings step use the stronger model — they fix the
@@ -934,6 +937,23 @@ Keychain; "Test connection" works for each provider you have). Change the shortc
 the new one works and the old one doesn't. Window looks native in light and dark.
 **Commit:** `pa-step-11: settings window with shortcut recorder and connection test`
 
+**Implementation notes (2026-11-06):**
+
+- **Tabs are General and Providers**; About (and the launch-at-login toggle) come in PA12, which
+  owns those features.
+- **The global hotkey is paused while recording**, otherwise pressing the current shortcut would
+  trigger a summary instead of being recorded. Recording uses a local key-down monitor that
+  swallows keys; logic lives in Core `ShortcutRecorderModel` (tested).
+- **Shortcut warnings** (clashes with an enabled macOS shortcut, or registration refused) show in
+  Settings and as a ⚠︎ line in the menu, which now refreshes each time it opens (NSMenuDelegate).
+- **API key fields never display the key**: a SecureField saves to the Keychain; the placeholder
+  says "Saved in Keychain — type to replace"; Remove deletes it.
+- **OpenAI preset shows its fixed server URL** (read-only) — consistent with PA10.1's lock.
+- **"Open Settings" in the panel now opens PreviewAI Settings → Providers**; the Apple
+  Intelligence section has its own "Open Apple Intelligence Settings" button.
+- `SettingsModel.settings` is a `var` (SwiftUI couldn't form bindings to nested config fields
+  through a `let`).
+
 ```text
 1. App: Settings/SettingsWindowController.swift — a standard NSWindow (titled, closable,
    toolbar-style tabs) hosting SwiftUI SettingsView; activates the app while open, returns to
@@ -965,6 +985,20 @@ non-empty, single-sentence message; (c) `LaunchAtLogin` wraps `SMAppService.main
 protocol and the settings toggle calls it (mock).
 **Commit:** `pa-step-12: launch at login, error polish, idle memory`
 
+**Implementation notes (2026-11-06):**
+
+- **Launch at login** via `SMAppService.mainApp` behind `LoginItemService`; `LaunchAtLogin`
+  keeps the setting truthful (syncs from the system on open; a refusal leaves the toggle off and
+  shows macOS's reason). Tests use a mock — the real login item is never touched.
+- **Idle memory:** closing the panel now tears it down (panel and SwiftUI hosting view released,
+  session text dropped); a test asserts a closed session with a running stream deallocates.
+- **Error copy:** `ProviderError.sentence(_:)` normalizes server/CLI text (capitalized, ends with
+  punctuation); a test checks every provider and document error reads as a short sentence. It
+  caught "…(HTTP 500): boom" with no period.
+- **Menu shows "Provider: …"** built from settings without constructing a provider (which could
+  read the Keychain each time the menu opens).
+- About tab: version, privacy line, GitHub link.
+
 ```text
 1. Launch at login via SMAppService.mainApp (register/unregister), surfaced in General.
 2. Closing the panel cancels work and drops the session's text; the SwiftUI hosting view is
@@ -993,6 +1027,21 @@ matches the code.
 GitHub Release (the agent does not publish releases).
 **Commit:** `pa-step-13: readme, distribution guide, make dist`
 
+**Implementation notes (2026-11-06):**
+
+- **Added `Resources/PreviewAI-DeveloperID.entitlements`** with
+  `com.apple.security.automation.apple-events`: notarization requires the hardened runtime,
+  which blocks Apple Events without this entitlement — the Finder-selection shortcut would
+  silently stop working in a signed release.
+- **Added `scripts/release.sh`** (sign with hardened runtime + entitlements, notarize via a
+  `notarytool` keychain profile, staple, zip, `spctl` assess) and
+  `Resources/PreviewAI-AppStore.entitlements` for the future App Store target. Both are
+  **untested** — they need the owner's Developer ID certificate / account. `bash -n` passes.
+- `make dist` existed since PA1; verified the zipped app (1.6 MB, zip 428 KB) passes
+  `codesign --verify --deep` after unzipping.
+- README rewritten for users (providers table, entry points, privacy); ARCHITECTURE and AGENTS
+  brought up to date.
+
 ```text
 1. Makefile `dist` target: make app, then `ditto -c -k --keepParent build/PreviewAI.app
    dist/PreviewAI-<version>.zip`.
@@ -1014,6 +1063,33 @@ commit red, never weaken a check to get green.
 This ends phase 4: push the branch, open the PR using the PR description template, merge when
 CI is green, then stop.
 ```
+
+### PA13.1 — Review fixes before merging phase 4 · strong · check
+
+> **Added mid-plan 2026-11-06** — an independent read-only review of the phase 4 diff.
+
+**Verify:** `make verify` green (120 tests), including: a denied Keychain read is remembered (no
+repeated prompts) until the key is saved again; "Open at login" needing approval stays on with an
+explanation and opens Login Items.
+**Commit:** `pa-step-13.1: review fixes — paste in settings, keychain re-prompts, recorder, teardown`
+
+**Implementation notes (2026-11-06):**
+
+- **⌘V didn't paste** into Settings fields: an accessory app only gets editing shortcuts from
+  main-menu key equivalents, and the hidden Edit menu lacked Paste/Cut/Undo/Redo. Added.
+- **Keychain denial is cached** so SwiftUI re-renders (every keystroke) can't re-trigger the
+  system prompt; saving the key clears it.
+- **The saved shortcut is always registered at launch**, even when it clashes with a macOS
+  shortcut (previously the clash check skipped registration).
+- **Recording ends when the Settings window loses focus**, and the key monitor only records keys
+  aimed at the Settings window — the summary panel's keys pass through.
+- **Panel teardown is deferred** to the next run-loop turn, since `close()` usually runs inside
+  the panel's own button/Esc handling.
+- **Login item `requiresApproval`** is a distinct state: the toggle stays on, a message explains,
+  and System Settings → Login Items opens. Synced each time Settings opens.
+- **Test Connection** keeps its task and cancels it when the provider changes or the window closes.
+- **README:** macOS 15+ needs System Settings → Privacy & Security → **Open Anyway** for
+  un-notarized apps (right-click → Open no longer works); run from /Applications.
 
 ---
 
@@ -1046,8 +1122,21 @@ CI is green, then stop.
   works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
   new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
   again (ad-hoc signature changes — see Landmines).
-- [ ] **PA8–PA10 (providers)** — until the PA11 settings window lands, these can only be
-  exercised once Settings exists; then for each provider you use: Anthropic key → summary streams
+- [ ] **PA11 / PA13.1** — paste an API key with ⌘V into a Settings field (and ⌘X/⌘Z work). Open Settings from the menu: General tab (click the shortcut, press a new one;
+  the old one stops working and the new one works; Esc cancels; Delete resets to ⌥⇧Space; try
+  ⌃⌥Space and see the macOS-shortcut warning), default length. Providers tab: picker; each
+  provider's fields; API keys save to the Keychain and are never shown; Ollama "Refresh" lists
+  models; "Test Connection" reports success/failure. Looks native in light and dark.
+- [ ] **PA12** — Settings → General → "Open PreviewAI at login" on → log out/in (or check System
+  Settings → General → Login Items) and PreviewAI is there; off removes it. About tab shows the
+  version and link. The menu shows "Provider: …". After closing the panel, Activity Monitor shows
+  PreviewAI's memory back near its idle level.
+- [ ] **PA13** — read README.md and docs/DISTRIBUTION.md for accuracy. When ready to ship:
+  run `scripts/release.sh "Developer ID Application: … (TEAMID)" <profile>` (one-time setup in
+  DISTRIBUTION.md), confirm the notarized app opens without a Gatekeeper warning on another Mac,
+  and decide whether to publish a GitHub Release (the agent doesn't publish releases).
+- [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
+  summary for each provider you use: Anthropic key → summary streams
   from `claude-opus-5-5`; OpenAI key + model → summary; Ollama/LM Studio running locally →
   summary, and with the server stopped → "Couldn't reach Ollama at localhost:11434 — is it
   running?"; Claude subscription → `claude -p` produces a summary (confirms the CLI accepts

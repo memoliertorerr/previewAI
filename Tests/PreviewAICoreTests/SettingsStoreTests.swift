@@ -101,6 +101,14 @@ import Testing
         guard case .unavailable(let reason) = await provider.availability() else { Issue.record("should be unavailable"); return }
         #expect(reason.contains("Keychain"))
         #expect(!reason.contains("Add your"))
+        // The denial is remembered: no repeated Keychain prompts on every render / hotkey.
+        #expect(secrets.reads == 1)
+        _ = settings.apiKey(for: .anthropic)
+        #expect(secrets.reads == 1)
+        // Re-entering the key clears it.
+        secrets.deniedAccounts = []
+        try settings.setAPIKey("sk-new", for: .anthropic)
+        #expect(settings.apiKey(for: .anthropic) == "sk-new")
     }
 
     @Test func customBaseURLOverridesPreset() {
