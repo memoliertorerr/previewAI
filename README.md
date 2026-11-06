@@ -14,7 +14,7 @@ zero third-party dependencies). Bring your own model:
 
 Supports PDF, Markdown, plain text, RTF, Word (.docx) and HTML.
 
-> **Status:** under construction. See [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for progress.
+> **Status:** under construction — Apple Intelligence works end to end; other providers are next. See [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for progress.
 
 ## Ways to summarize
 

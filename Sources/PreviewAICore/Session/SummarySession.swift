@@ -35,6 +35,9 @@ public final class SummarySession {
     /// Name of the provider/model producing the current summary.
     public private(set) var providerLabel: String = ""
     public private(set) var length: SummaryLength = .standard
+    /// True when the current failure is about the provider (off, not set up, key rejected),
+    /// so the panel can offer "Open Settings".
+    public private(set) var failureNeedsSettings = false
 
     @ObservationIgnored public var stateDidChange: (@MainActor (State) -> Void)?
     @ObservationIgnored private let loader: DocumentLoader
@@ -61,6 +64,7 @@ public final class SummarySession {
         let current = generation
         last = (url, provider)
         self.length = length
+        failureNeedsSettings = false
         providerLabel = provider.modelName.isEmpty ? provider.displayName : "\(provider.displayName) · \(provider.modelName)"
         state = .loading(DocumentInfo(url: url))
         task = Task { [weak self] in
@@ -84,6 +88,7 @@ public final class SummarySession {
     /// Shows a message without a document (e.g. "Select a document in Finder first").
     public func showMessage(_ message: String) {
         cancel()
+        failureNeedsSettings = false
         state = .failed(nil, message)
     }
 
@@ -103,7 +108,7 @@ public final class SummarySession {
         var info = DocumentInfo(url: url)
 
         if case .unavailable(let reason) = await provider.availability() {
-            finish(.failed(info, reason), generation: current)
+            finish(.failed(info, reason), needsSettings: true, generation: current)
             return
         }
 
@@ -138,7 +143,11 @@ public final class SummarySession {
         } catch is CancellationError {
             return
         } catch {
-            finish(.failed(info, error.localizedDescription), generation: current)
+            let needsSettings: Bool = switch error as? ProviderError {
+            case .notConfigured, .unauthorized, .unavailable: true
+            default: false
+            }
+            finish(.failed(info, error.localizedDescription), needsSettings: needsSettings, generation: current)
             return
         }
         guard current == generation, !Task.isCancelled else { return }
@@ -152,8 +161,9 @@ public final class SummarySession {
         finish(.finished(info, summary), generation: current)
     }
 
-    private func finish(_ newState: State, generation current: Int) {
+    private func finish(_ newState: State, needsSettings: Bool = false, generation current: Int) {
         guard current == generation else { return }
+        failureNeedsSettings = needsSettings
         state = newState
     }
 }

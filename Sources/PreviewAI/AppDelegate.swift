@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkey = HotkeyManager()
     private let services = ServiceProvider()
     private let session = SummarySession()
+    private let registry = ProviderRegistry()
     private lazy var panelModel = PanelModel(session: session)
     private lazy var panel = SummaryPanelController(model: panelModel)
     /// Menu line for problems that shouldn't pop up the panel (e.g. the shortcut is taken).
@@ -20,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !hotkey.register(.default) {
             showInMenu("Shortcut \(KeyCombo.default.displayString) is taken by another app")
         }
+
+        panelModel.onOpenSettings = { [weak self] in self?.openProviderSettings() }
 
         services.onFiles = { [weak self] urls in self?.handle(files: urls) }
         NSApp.servicesProvider = services
@@ -79,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panelModel.additionalFiles = files.count - 1
         panel.show()
-        session.summarize(url: first, provider: Self.demoProvider(), length: panelModel.length)
+        session.summarize(url: first, provider: registry.current, length: panelModel.length)
     }
 
     private func showInPanel(_ message: String) {
@@ -88,22 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.show()
     }
 
-    /// Temporary until PA6 wires real providers: streams a canned summary.
-    private static func demoProvider() -> ScriptedProvider {
-        let text = """
-        **TL;DR:** This is a demo summary that streams in word by word so the panel can be reviewed before real providers are connected.
-
-        ### What it shows
-        - Headings, **bold**, *italic* and `code` render inline
-        - Bullet lists, including nested ones:
-          - like this one
-        1. Numbered steps
-        2. Keep their numbers
-
-        Why it matters: the real summary will look exactly like this.
-        """
-        let words = text.split(separator: " ", omittingEmptySubsequences: false).map { String($0) + " " }
-        return ScriptedProvider(displayName: "Demo", modelName: "", chunks: words, delay: .milliseconds(25))
+    /// Until the PreviewAI settings window exists (PA11), "Open Settings" goes to the
+    /// relevant System Settings pane.
+    private func openProviderSettings() {
+        panel.close()
+        let pane = URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!
+        if !NSWorkspace.shared.open(pane) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+        }
     }
 
     // MARK: - Menu

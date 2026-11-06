@@ -90,7 +90,7 @@ struct SummaryView: View {
     }
 
     private var settingsAction: (() -> Void)? {
-        guard model.onOpenSettings != nil else { return nil }
+        guard model.onOpenSettings != nil, model.session.failureNeedsSettings else { return nil }
         return { model.openSettings() }
     }
 

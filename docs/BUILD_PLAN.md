@@ -40,7 +40,7 @@
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ✅ done |
 | PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ✅ done |
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ✅ done |
-| PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ⬜ todo |
+| PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ✅ done |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
@@ -622,6 +622,22 @@ streams in. With it disabled, the panel shows "Apple Intelligence is turned off"
 "Open Settings" button.
 **Commit:** `pa-step-6: apple intelligence provider and end-to-end summarize flow`
 
+**Implementation notes (2026-11-06):**
+
+- **Budget comes from the model's reported `contextSize`** (back-deployed API): `(contextSize −
+  1 600 reserved tokens) × 3 chars/token`, floor 2 000 — 7 488 characters for a 4 096-token
+  window. Output is capped at 1 000 tokens for this provider so "Detailed" can't overflow.
+- **`DeltaTracker`** converts FoundationModels' cumulative snapshots to deltas and never
+  re-emits already-sent text if the model revises.
+- **`SummarySession.failureNeedsSettings`** added so "Open Settings" appears only for provider
+  problems (unavailable / not configured / key rejected), not for document errors.
+- **"Open Settings" goes to System Settings → Apple Intelligence & Siri** for now
+  (`x-apple.systempreferences:com.apple.Siri-Settings.extension`, falling back to opening System
+  Settings); PA11 points it at PreviewAI's own settings window.
+- `UnavailableProvider` stands in for providers that aren't built/configured yet.
+- **Not verified by the session that built it:** any real Apple Intelligence output — it is
+  disabled on the dev machine (the provider correctly reports `appleIntelligenceNotEnabled`).
+
 ```text
 First real provider and the full flow: entry point → panel → stream.
 
@@ -897,6 +913,12 @@ CI is green, then stop.
   button, and pressing ⌃⌥Space again all close it; ⇧⌘C copies the summary; ⌘R regenerates;
   the Brief/Standard/Detailed switch restarts it. Press ⌃⌥Space with Finder *not* frontmost →
   the panel shows "Select a document in Finder…".
+  *(Since PA6 the panel shows real Apple Intelligence output instead of the demo text.)*
+- [ ] **PA6** — with Apple Intelligence **enabled** (System Settings → Apple Intelligence &
+  Siri), select a Markdown file and a PDF in Finder and press ⌃⌥Space: the panel opens
+  instantly and a real summary streams in; a long PDF shows "Summarized the first N%". With it
+  **disabled**, the panel says "Apple Intelligence is turned off…" with an "Open Settings"
+  button that opens the Apple Intelligence & Siri pane.
 
 ---
 

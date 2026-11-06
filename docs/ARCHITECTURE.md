@@ -47,6 +47,8 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `KeyCombo` | `Core/Hotkey/` | Shortcut as data: Codable, display string (⌃⌥⇧⌘ order), Carbon modifier mask, validity. |
 | `PanelContent`, `MarkdownBlock` | `Core/Session/` | What the panel shows for each state; Markdown split into blocks (SwiftUI `Text` only renders inline Markdown). |
 | `SummaryPanelController`, `SummaryView`, `PanelModel` | `App/SummaryPanel/` | Borderless, non-activating floating `NSPanel` (Liquid Glass on macOS 26) hosting SwiftUI. Esc/×/shortcut close it; closing calls `session.close()`. |
+| `AppleIntelligenceProvider` | `Core/Providers/` | FoundationModels (`#if canImport`, macOS 26+). Budget derived from `contextSize`; snapshots → deltas via `DeltaTracker`. |
+| `ProviderRegistry`, `UnavailableProvider` | `Core/Providers/` | Builds the selected provider; unconfigured ones explain themselves. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants
