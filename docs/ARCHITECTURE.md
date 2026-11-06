@@ -24,6 +24,17 @@ state: idle → loading → streaming(text…) → finished(text) | failed(messa
 SummaryPanel (SwiftUI in a non-activating NSPanel) renders the state
 ```
 
+## Entry points
+
+All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint.resolveFiles`.
+
+| Path | Code | Variant | Notes |
+|---|---|---|---|
+| Global shortcut (default ⌃⌥Space) | `HotkeyManager` (Carbon `RegisterEventHotKey`) → `FinderSelection` | direct | Asks Finder for its selection via Apple Events, only when Finder is frontmost. First use triggers the macOS Automation prompt. In the APPSTORE build the shortcut shows a hint to use the Service. |
+| Service "Summarize with PreviewAI" | `ServiceProvider` + `NSServices` in `Info.plist` | both | Finder → right-click → Quick Actions/Services. Bindable to a shortcut in System Settings → Keyboard → Keyboard Shortcuts → Services. Limited to supported document types. |
+| Open With / drop on app icon | `application(_:open:)` + `CFBundleDocumentTypes` (Viewer, Alternate rank) | both | |
+| Summarize File… (⌘O in the menu) | `NSOpenPanel` | both | |
+
 ## Key types
 
 | Type | File | Role |
@@ -33,6 +44,7 @@ SummaryPanel (SwiftUI in a non-activating NSPanel) renders the state
 | `SummaryProvider` | `Core/Providers/SummaryProvider.swift` | The contract: `availability()`, `inputBudget`, `stream(_:)`. Cancelling the consuming task must stop the provider's work (it is torn down via `onTermination`). |
 | `ScriptedProvider` | `Core/Providers/` | Canned chunks; used by tests and the debug demo. |
 | `SummarySession` | `Core/Session/` | One summary at a time; a generation counter discards results from superseded requests. |
+| `KeyCombo` | `Core/Hotkey/` | Shortcut as data: Codable, display string (⌃⌥⇧⌘ order), Carbon modifier mask, validity. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 
 ## Build variants

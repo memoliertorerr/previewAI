@@ -38,7 +38,7 @@
 | PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ✅ done |
 | PA2 | Document loading + per-provider text budgets | strong | auto | ✅ done |
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ✅ done |
-| PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ⬜ todo |
+| PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ✅ done |
 | PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ⬜ todo |
 | PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ⬜ todo |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
@@ -485,6 +485,20 @@ received (temporary "Last file: …" item). Right-click a file → Quick Actions
 → Services → Files and Folders and confirm the shortcut triggers it.
 **Commit:** `pa-step-4: global hotkey, finder selection, service and open-with entry points`
 
+**Implementation notes (2026-11-06):**
+
+- **Service file types are the supported document types**, not `public.item`, so the Service
+  only appears for files PreviewAI can read.
+- **Bug fixed in PA2 code:** `.rtfd` was reported unsupported (`UTType(filenameExtension:)` only
+  resolves data types, and RTFD is a package). `DocumentLoader.kind` special-cases it; a
+  table-driven test now covers extension → kind.
+- The menu shows the shortcut as a disabled "Shortcut: ⌃⌥Space" line rather than a key
+  equivalent (a menu key equivalent would only fire while the menu is open, which is misleading).
+- Feedback is a temporary status line in the menu ("Last file: …", "Select a document in
+  Finder first", Automation-denied hint) until the panel lands in PA5/PA6.
+- Verified the APPSTORE binary contains no Finder AppleScript (`strings … | grep 'tell
+  application "Finder"'` → 0; direct build → 1).
+
 ```text
 Wire every way a file reaches the app. No summarizing yet — the panel is PA5.
 
@@ -853,7 +867,12 @@ CI is green, then stop.
 
 > `check` steps copy their Human check here when they land. Tick when done.
 
-- *(none yet)*
+- [ ] **PA4** — run `make app && open build/PreviewAI.app`; select a PDF in Finder, press
+  ⌃⌥Space → the Automation prompt appears once; after allowing, the menu shows "Last file: …"
+  (until PA6 replaces it with the panel). Right-click a file → Quick Actions / Services →
+  "Summarize with PreviewAI" exists; bind it in System Settings → Keyboard → Keyboard Shortcuts
+  → Services → Files and Folders and confirm the shortcut triggers it. (The Service may only
+  appear after the app has been launched once, or after moving it to /Applications.)
 
 ---
 

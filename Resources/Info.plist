@@ -32,5 +32,52 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Mehmet Ali Ertorer. MIT License.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Summarize with PreviewAI</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>summarizeFiles</string>
+			<key>NSPortName</key>
+			<string>PreviewAI</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>net.daringfireball.markdown</string>
+				<string>public.plain-text</string>
+				<string>public.rtf</string>
+				<string>com.apple.rtfd</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>public.html</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+				<string>net.daringfireball.markdown</string>
+				<string>public.plain-text</string>
+				<string>public.rtf</string>
+				<string>com.apple.rtfd</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>public.html</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

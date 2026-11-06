@@ -39,8 +39,10 @@ Sources/PreviewAICore/        all logic that can be unit-tested (no AppKit windo
   Settings/                   SettingsStore, KeyValueStore, SecretStore (Keychain)
   Session/                    SummarySession (state machine the panel renders), SummaryCache
   Hotkey/                     KeyCombo (pure model of a shortcut)
-Sources/PreviewAI/            the app: AppDelegate, status item, HotkeyManager (Carbon),
-                              FinderSelection (Apple Events), SummaryPanel, Settings window
+  EntryPoint.swift            filtering shared by every way a file reaches the app
+Sources/PreviewAI/            the app: AppDelegate (menu + entry points), HotkeyManager (Carbon),
+                              FinderSelection (Apple Events, direct build only), ServiceProvider
+                              (Finder Service), SummaryPanel, Settings window
 Tests/PreviewAICoreTests/     unit tests; Fixtures/ for committed sample files and fake CLIs
 docs/BUILD_PLAN.md            the plan and progress tracker (single source of truth for status)
 docs/ARCHITECTURE.md          how the pieces fit (kept current)
