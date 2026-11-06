@@ -8,8 +8,24 @@ public enum ProviderID: String, Codable, CaseIterable, Sendable {
         case .appleIntelligence: "Apple Intelligence"
         case .anthropic: "Anthropic API"
         case .openAICompatible: "OpenAI-compatible"
-        case .claudeCode: "Claude subscription"
-        case .codex: "Codex subscription"
+        // Descriptive names only: Anthropic and OpenAI don't allow their product names to be
+        // used as our own feature names (see docs/PROVIDER_TERMS.md).
+        case .claudeCode: "Claude Code CLI (your login)"
+        case .codex: "Codex CLI (your login)"
+        }
+    }
+
+    /// Shown wherever a CLI provider is chosen. Keeps PreviewAI inside Anthropic's and OpenAI's
+    /// published rules: the user's own unmodified CLI and login, usage on their own plan, no
+    /// implied affiliation, API keys recommended. See docs/PROVIDER_TERMS.md.
+    public var termsNotice: String? {
+        switch self {
+        case .claudeCode:
+            "PreviewAI runs the Claude Code CLI you installed, signed in with your own account — PreviewAI never sees or stores your login. Each summary counts toward your Claude plan's usage limits, which assume ordinary individual use. For regular use, Anthropic recommends an API key: choose “Anthropic API”. PreviewAI isn't made by, affiliated with, or endorsed by Anthropic."
+        case .codex:
+            "PreviewAI runs the Codex CLI you installed, signed in with your own account — PreviewAI never sees or stores your login. Each summary counts toward your ChatGPT plan's usage limits. For automation, OpenAI recommends an API key: choose “OpenAI-compatible”. PreviewAI isn't made by, affiliated with, or endorsed by OpenAI."
+        default:
+            nil
         }
     }
 }

@@ -194,3 +194,33 @@ import Testing
     }
 }
 #endif
+
+/// Guards the wording that keeps the CLI providers within Anthropic's and OpenAI's published
+/// rules (docs/PROVIDER_TERMS.md). Change these only together with that document.
+@Suite struct ProviderTermsTests {
+    @Test func cliProvidersAreLabelledDescriptively() {
+        #expect(ProviderID.claudeCode.displayName == "Claude Code CLI (your login)")
+        #expect(ProviderID.codex.displayName == "Codex CLI (your login)")
+        for id in ProviderID.allCases {
+            #expect(!id.displayName.lowercased().contains("subscription"), "\(id)")
+        }
+    }
+
+    @Test func cliProvidersCarryTheRequiredNotices() throws {
+        let claude = try #require(ProviderID.claudeCode.termsNotice)
+        #expect(claude.contains("isn't made by, affiliated with, or endorsed by Anthropic"))
+        #expect(claude.contains("never sees or stores your login"))
+        #expect(claude.contains("usage limits"))
+        #expect(claude.contains("API key"))
+
+        let codex = try #require(ProviderID.codex.termsNotice)
+        #expect(codex.contains("isn't made by, affiliated with, or endorsed by OpenAI"))
+        #expect(codex.contains("never sees or stores your login"))
+        #expect(codex.contains("usage limits"))
+        #expect(codex.contains("API key"))
+
+        for id in [ProviderID.appleIntelligence, .anthropic, .openAICompatible] {
+            #expect(id.termsNotice == nil)
+        }
+    }
+}

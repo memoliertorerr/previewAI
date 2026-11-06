@@ -9,7 +9,7 @@ PreviewAI is a lightweight, native macOS menu-bar app. Select a document in Find
 global shortcut of your choosing, and a small floating panel (Quick Look-style) streams an AI
 summary of it. Users pick the model backend: Apple Intelligence (on-device), an Anthropic API
 key, an OpenAI-compatible API key, a local model server (Ollama / LM Studio), or their existing
-Claude / Codex subscription via the installed `claude` / `codex` CLIs.
+Claude / ChatGPT plan through the user's own installed `claude` / `codex` CLIs.
 
 Priorities, in order: **fast** (panel appears instantly, text streams), **light** (menu-bar only,
 no Dock icon, no background work while idle, zero third-party dependencies), **native** (AppKit +
@@ -50,6 +50,7 @@ Tests/PreviewAICoreTests/     unit tests; Fixtures/ for committed sample files a
 docs/BUILD_PLAN.md            the plan and progress tracker (single source of truth for status)
 docs/ARCHITECTURE.md          how the pieces fit (kept current)
 docs/DISTRIBUTION.md          Developer ID signing/notarization and the App Store path
+docs/PROVIDER_TERMS.md        what Anthropic/OpenAI allow for the CLI providers (re-check per release)
 ```
 
 ## Commands
@@ -75,6 +76,11 @@ docs/DISTRIBUTION.md          Developer ID signing/notarization and the App Stor
 6. **Every change updates whatever docs went stale** — this file, `docs/ARCHITECTURE.md`,
    `README.md`, and the tracker in `docs/BUILD_PLAN.md` — in the same commit.
 7. Match the surrounding code's style; comments are short and explain *why*.
+8. **CLI providers follow `docs/PROVIDER_TERMS.md`.** Never read, store, prompt for, log, or pass
+   CLI credentials (`~/.claude`, `~/.codex`, OAuth tokens); never bundle, download, or modify the
+   CLIs or disable their sign-in methods; no in-app login, background/batch use, or rate-limit
+   workarounds; descriptive labels only ("Claude Code CLI (your login)"), no implied affiliation.
+   A paid or App Store build ships without them unless the vendors have approved it.
 
 ## Git and GitHub (project-specific override)
 

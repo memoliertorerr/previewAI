@@ -51,6 +51,7 @@
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ✅ done |
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ✅ done |
 | PA13.1 | Review fixes before merging phase 4 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
+| PA14 | Provider-terms compliance for the CLI providers *(added 2026-11-06)* | strong | check | ✅ done |
 
 **Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1, PA10.1 and PA13.1).
 What remains is the owner's **Pending human checks** (UI, permissions, real providers) and the
@@ -1091,6 +1092,31 @@ explanation and opens Login Items.
 - **README:** macOS 15+ needs System Settings → Privacy & Security → **Open Anyway** for
   un-notarized apps (right-click → Open no longer works); run from /Applications.
 
+### PA14 — Provider-terms compliance for the CLI providers · strong · check
+
+> **Added 2026-11-06** at the owner's request: check whether Anthropic and OpenAI allow a
+> third-party app to drive their CLIs with the user's plan login, and follow their rules.
+
+**Verify:** `make verify` green (122 tests), including `ProviderTermsTests` pinning the
+descriptive labels and the Settings notices.
+**Commit:** `pa-step-14: follow anthropic and openai rules for the cli providers`
+
+**Implementation notes (2026-11-06):**
+
+- Research (three parallel read-only subagents; Anthropic's legal page re-fetched and verified
+  verbatim) is recorded with sources in `docs/PROVIDER_TERMS.md`. Verdict: allowed with
+  conditions for a free, open-source, local app; paid / App Store builds need vendor approval
+  (Anthropic) or the Sign in with ChatGPT program (OpenAI), or ship without these providers.
+- Renamed "Claude subscription" / "Codex subscription" to "Claude Code CLI (your login)" /
+  "Codex CLI (your login)" — the vendors' product names can't be our feature names.
+- Settings shows a notice per CLI provider (own unmodified CLI and login, never seen or stored by
+  PreviewAI, counts toward plan limits, API key recommended, not affiliated); About, README carry
+  an independence statement. AGENTS.md rule 8 makes the conditions standing rules.
+- Code already met the technical conditions (no credential access, unmodified CLI, sign-in
+  methods intact, one request per user action, no rate-limit workarounds) — no behavior change.
+- **Owner action:** accept Anthropic's Commercial Terms before distributing a build with the
+  Claude Code CLI provider (see `docs/PROVIDER_TERMS.md` → Owner actions).
+
 ---
 
 ## Pending human checks
@@ -1187,6 +1213,7 @@ Populated from real friction, not speculation:
 
 | Item | Design | What it needs |
 |---|---|---|
+| **Sign in with ChatGPT** | Replace the Codex CLI route with OpenAI's official SIWC program for third-party apps (open-source apps eligible; paid apps via interest form) | Register an OAuth client with OpenAI; implement the SIWC flow |
 | **Developer ID + notarization** | `codesign --options runtime` with a Developer ID cert; `notarytool` in a `make release` target; optional CI job with secrets | Owner's certificate and an app-specific password / API key in the keychain or CI secrets |
 | **Mac App Store build** | Xcode project wrapping the same sources; `APPSTORE` flag; sandbox entitlements; Finder Action extension (appex) as the entry point; Apple Intelligence, API-key and local providers only | Xcode project, appex target, App Store Connect record, review notes |
 | **Long-document mode** | Map-reduce: chunk by budget, summarize chunks in parallel, then summarize the summaries | Chunker + session progress UI |

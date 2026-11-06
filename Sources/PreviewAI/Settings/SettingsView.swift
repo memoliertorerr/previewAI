@@ -97,6 +97,11 @@ private struct AboutSettings: View {
                 .frame(maxWidth: 380)
             Link("github.com/memoliertorerr/previewAI", destination: URL(string: "https://github.com/memoliertorerr/previewAI")!)
                 .padding(.top, 4)
+            Text("PreviewAI is an independent open-source project. It isn't made by, affiliated with, or endorsed by Apple, Anthropic, OpenAI, Ollama, or LM Studio. Product names belong to their owners.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
         }
         .padding(30)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -255,10 +260,15 @@ private struct CLIForm: View {
             TextField("Path override", text: config.binaryPath, prompt: Text("Auto-detect"))
             TextField("Model", text: config.model, prompt: Text("CLI default"))
             Text(tool == .claudeCode
-                 ? "Uses your Claude subscription through Claude Code (`claude`). Log in once by running `claude` in Terminal."
-                 : "Uses your ChatGPT subscription through Codex (`codex`). Log in once by running `codex` in Terminal.")
+                 ? "Install Claude Code and sign in once by running `claude` in Terminal."
+                 : "Install Codex and sign in once by running `codex` in Terminal.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if let notice = tool.termsNotice {
+                Label(notice, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
