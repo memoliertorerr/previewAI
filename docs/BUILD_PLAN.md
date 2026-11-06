@@ -35,7 +35,7 @@
 
 | Step | Scope | Model | Gate | Status |
 |------|-------|-------|------|--------|
-| PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ⬜ todo |
+| PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ✅ done |
 | PA2 | Document loading + per-provider text budgets | strong | auto | ⬜ todo |
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ⬜ todo |
 | PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ⬜ todo |
@@ -272,6 +272,17 @@ Do not redesign these mid-plan; if a step seems to require changing one, that is
 produces `build/PreviewAI.app` whose `Contents/Info.plist` passes `plutil -lint` and has
 `LSUIElement = true`; the `APPSTORE=1` variant also builds; `.github/workflows/ci.yml` exists.
 **Commit:** `pa-step-1: swiftpm scaffold, menu-bar shell, make verify, ci`
+
+**Implementation notes (2026-11-06):**
+
+- **`scripts/bundle.sh` takes `<binary> <app path>`** instead of building itself; the Makefile
+  does the build so the pinned SwiftPM paths live in one place. It refuses to write outside the
+  repo.
+- **The APPSTORE variant uses its own scratch dir** (`.build/appstore`) so switching `-D` flags
+  doesn't force full rebuilds of the normal build.
+- **`make lint` also runs `codesign --verify --deep`** on both bundles.
+- The core constants enum is `PreviewAIInfo` (not `PreviewAI`) to avoid clashing with the
+  executable module name.
 
 ```text
 Create the project skeleton. Nothing user-facing beyond a menu-bar icon.
