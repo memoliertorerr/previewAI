@@ -12,8 +12,8 @@ third-party dependencies, about 1.6 MB. Bring your own model:
 | **Claude (Anthropic API)** | An API key from console.anthropic.com | Anthropic |
 | **OpenAI-compatible** | An OpenAI key — or any compatible server (OpenRouter, Groq, …) | That service |
 | **Ollama / LM Studio** | The app running locally with a model pulled | Stays on your Mac |
-| **Claude subscription** | Claude Code (`claude`) installed and logged in | Anthropic |
-| **Codex subscription** | Codex (`codex`) installed and logged in | OpenAI |
+| **Claude Code CLI** | Claude Code (`claude`) installed and signed in with your own account | Anthropic |
+| **Codex CLI** | Codex (`codex`) installed and signed in with your own account | OpenAI |
 
 Reads PDF, Markdown, plain text (including source code), RTF/RTFD, Word (.docx) and HTML.
 
@@ -54,8 +54,11 @@ Settings → Providers → choose one, fill in its fields, and click **Test Conn
   and cheaper.
 - **OpenAI-compatible** — choose OpenAI, Ollama, LM Studio or Custom; **Refresh** lists the
   server's models. Keys are stored per service and are only sent over HTTPS (or to this Mac).
-- **Claude / Codex subscriptions** — PreviewAI runs the installed CLI in a locked-down mode (no
-  tools, no saved session, read-only). Log in once by running `claude` or `codex` in Terminal.
+- **Claude Code CLI / Codex CLI** — PreviewAI runs the CLI *you* installed, in a locked-down mode
+  (no tools, no saved session, read-only), with the login you already have. PreviewAI never sees
+  or stores that login; usage counts toward your own plan. Sign in once by running `claude` or
+  `codex` in Terminal. For regular use, both vendors recommend an API key instead. Details and
+  sources: [`docs/PROVIDER_TERMS.md`](docs/PROVIDER_TERMS.md).
 
 API keys are stored only in your macOS Keychain.
 
@@ -84,4 +87,5 @@ Store build — see **Later** in the build plan.
 
 ## License
 
-MIT
+MIT. PreviewAI is an independent project — not made by, affiliated with, or endorsed by Apple,
+Anthropic, OpenAI, Ollama, or LM Studio. Product names belong to their owners.

@@ -1,7 +1,8 @@
 #if !APPSTORE
 import Foundation
 
-/// Claude through the user's Claude subscription, via `claude -p` (Claude Code).
+/// Claude via the user's own installed, unmodified Claude Code CLI (`claude -p`) and its own
+/// login. PreviewAI never reads, stores, or passes credentials (docs/PROVIDER_TERMS.md).
 public struct ClaudeCodeProvider: SummaryProvider {
     public let id = ProviderID.claudeCode
     public let displayName = "Claude Code"
@@ -21,7 +22,7 @@ public struct ClaudeCodeProvider: SummaryProvider {
             : .ready
     }
 
-    /// Never `--bare`: bare mode ignores the subscription login and only reads ANTHROPIC_API_KEY.
+    /// Never `--bare`: bare mode ignores the user's Claude login and only reads ANTHROPIC_API_KEY.
     /// Running in `/` with only project settings loads none of the user's hooks, plugins, or
     /// CLAUDE.md files; no tools, no MCP, no saved session.
     func arguments(for request: SummaryRequest) -> [String] {
@@ -99,7 +100,8 @@ public struct ClaudeCodeProvider: SummaryProvider {
     }
 }
 
-/// OpenAI models through the user's ChatGPT/Codex subscription, via `codex exec`.
+/// OpenAI models via the user's own installed Codex CLI (`codex exec`) and its own login.
+/// PreviewAI never reads, stores, or passes credentials (docs/PROVIDER_TERMS.md).
 public struct CodexProvider: SummaryProvider {
     public let id = ProviderID.codex
     public let displayName = "Codex"

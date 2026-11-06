@@ -6,7 +6,7 @@ PreviewAI ships two ways from the same sources:
 |---|---|---|
 | Build | `make app` + `scripts/release.sh` | Xcode project (not created yet) with `-DAPPSTORE` |
 | Finder-selection shortcut | ✅ (Apple Events) | ❌ — use the Finder Service instead |
-| Claude / Codex subscriptions | ✅ (runs the CLIs) | ❌ — sandboxed apps can't run them |
+| Claude Code CLI / Codex CLI providers | ✅ free build (see `PROVIDER_TERMS.md`) | ❌ — sandboxed apps can't run them |
 | Apple Intelligence, API keys, local servers | ✅ | ✅ |
 | Status | Script written, **untested** until run with your certificate | Planned (see **Later** in BUILD_PLAN.md) |
 
@@ -33,6 +33,8 @@ PreviewAI ships two ways from the same sources:
 
 ### Each release
 
+0. Re-read the pages linked in `docs/PROVIDER_TERMS.md`; if a paid build is planned, follow its
+   "paid build" row first.
 1. Bump `CFBundleShortVersionString` / `CFBundleVersion` in `Resources/Info.plist` and
    `PreviewAIInfo.version` in `Sources/PreviewAICore/PreviewAICore.swift`.
 2. `make verify`
@@ -65,4 +67,5 @@ What the App Store build needs, given the architecture already in place:
    compiled out). `NSAllowsLocalNetworking` is already set for Ollama / LM Studio.
 5. **Review notes:** explain that the app needs the user's own API key or a local server, and how
    to test with Apple Intelligence.
-6. **Check provider terms** before marketing subscription use (applies to the direct build too).
+6. **Provider terms:** the App Store build has no CLI providers, which also keeps it clear of
+   Anthropic's and OpenAI's rules on third-party use of plan logins (`docs/PROVIDER_TERMS.md`).
