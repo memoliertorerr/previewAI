@@ -10,6 +10,7 @@ public final class ScriptedProvider: SummaryProvider, @unchecked Sendable {
     private let delay: Duration
     private let failure: ProviderError?
     private let available: ProviderAvailability
+    private let maxPromptCharacters: Int?
 
     private let lock = NSLock()
     private var _calls: [SummaryRequest] = []
@@ -23,8 +24,10 @@ public final class ScriptedProvider: SummaryProvider, @unchecked Sendable {
         chunks: [String],
         delay: Duration = .zero,
         failure: ProviderError? = nil,
-        availability: ProviderAvailability = .ready
+        availability: ProviderAvailability = .ready,
+        maxPromptCharacters: Int? = nil
     ) {
+        self.maxPromptCharacters = maxPromptCharacters
         self.id = id
         self.displayName = displayName
         self.modelName = modelName
@@ -43,6 +46,9 @@ public final class ScriptedProvider: SummaryProvider, @unchecked Sendable {
     public func stream(_ request: SummaryRequest) -> AsyncThrowingStream<String, Error> {
         lock.withLock { _calls.append(request) }
         let chunks = chunks, delay = delay, failure = failure
+        if let maxPromptCharacters, request.user.count > maxPromptCharacters {
+            return AsyncThrowingStream { $0.finish(throwing: ProviderError.contextTooLong) }
+        }
         return AsyncThrowingStream { continuation in
             let task = Task {
                 for chunk in chunks {

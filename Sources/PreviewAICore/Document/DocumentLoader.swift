@@ -22,6 +22,8 @@ public struct DocumentLoader: Sendable {
     public static func kind(for url: URL) -> DocumentKind? {
         let ext = url.pathExtension.lowercased()
         if ["md", "markdown", "mdown", "mkd"].contains(ext) { return .markdown }
+        // RTFD is a package (a folder); `UTType(filenameExtension:)` only resolves data types.
+        if ext == "rtfd" { return .richText }
         guard let type = UTType(filenameExtension: ext) else { return nil }
         if type.conforms(to: .pdf) { return .pdf }
         if type.conforms(to: .html) { return .html }

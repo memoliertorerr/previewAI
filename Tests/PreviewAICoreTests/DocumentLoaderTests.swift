@@ -64,6 +64,17 @@ import Testing
         #expect(doc.text.contains("the budget was approved"))
     }
 
+    @Test func kindsResolveFromExtensions() {
+        let cases: [(String, DocumentKind?)] = [
+            ("a.pdf", .pdf), ("a.md", .markdown), ("a.markdown", .markdown), ("a.txt", .plainText),
+            ("a.swift", .plainText), ("a.rtf", .richText), ("a.rtfd", .richText), ("a.docx", .word),
+            ("a.html", .html), ("a.png", nil), ("a.zip", nil),
+        ]
+        for (name, kind) in cases {
+            #expect(DocumentLoader.kind(for: URL(fileURLWithPath: "/x/\(name)")) == kind, "\(name)")
+        }
+    }
+
     @Test func unsupportedTypeThrows() async throws {
         let url = try TestSupport.scratch().appendingPathComponent("picture.png")
         try Data([0x89, 0x50, 0x4E, 0x47]).write(to: url)

@@ -35,6 +35,9 @@ public final class SummarySession {
     /// Name of the provider/model producing the current summary.
     public private(set) var providerLabel: String = ""
     public private(set) var length: SummaryLength = .standard
+    /// True when the current failure is about the provider (off, not set up, key rejected),
+    /// so the panel can offer "Open Settings".
+    public private(set) var failureNeedsSettings = false
 
     @ObservationIgnored public var stateDidChange: (@MainActor (State) -> Void)?
     @ObservationIgnored private let loader: DocumentLoader
@@ -61,10 +64,12 @@ public final class SummarySession {
         let current = generation
         last = (url, provider)
         self.length = length
+        failureNeedsSettings = false
         providerLabel = provider.modelName.isEmpty ? provider.displayName : "\(provider.displayName) · \(provider.modelName)"
         state = .loading(DocumentInfo(url: url))
         task = Task { [weak self] in
-            await self?.run(url: url, provider: provider, length: length, useCache: useCache, generation: current)
+            await self?.run(url: url, provider: provider, length: length, useCache: useCache,
+                            budget: provider.inputBudget, isRetry: false, generation: current)
         }
     }
 
@@ -81,6 +86,13 @@ public final class SummarySession {
         state = .idle
     }
 
+    /// Shows a message without a document (e.g. "Select a document in Finder first").
+    public func showMessage(_ message: String) {
+        cancel()
+        failureNeedsSettings = false
+        state = .failed(nil, message)
+    }
+
     /// Cancels work and forgets the last request and its text (frees memory when the panel closes).
     public func close() {
         cancel()
@@ -93,17 +105,22 @@ public final class SummarySession {
         await task?.value
     }
 
-    private func run(url: URL, provider: any SummaryProvider, length: SummaryLength, useCache: Bool, generation current: Int) async {
+    /// Divisor applied to the budget when a provider reports its context overflowed — covers
+    /// scripts that use far more tokens per character than the budget assumes (e.g. CJK).
+    static let contextRetryDivisor = 3
+
+    private func run(url: URL, provider: any SummaryProvider, length: SummaryLength, useCache: Bool,
+                     budget: Int, isRetry: Bool, generation current: Int) async {
         var info = DocumentInfo(url: url)
 
         if case .unavailable(let reason) = await provider.availability() {
-            finish(.failed(info, reason), generation: current)
+            finish(.failed(info, reason), needsSettings: true, generation: current)
             return
         }
 
         let document: DocumentContent
         do {
-            document = try await loader.load(url).budgeted(maxCharacters: provider.inputBudget)
+            document = try await loader.load(url).budgeted(maxCharacters: budget)
         } catch {
             finish(.failed(info, error.localizedDescription), generation: current)
             return
@@ -131,8 +148,18 @@ public final class SummarySession {
             }
         } catch is CancellationError {
             return
+        } catch ProviderError.contextTooLong where !isRetry && text.isEmpty {
+            guard current == generation else { return }
+            await run(url: url, provider: provider, length: length, useCache: useCache,
+                      budget: max(1, min(budget, document.text.count) / Self.contextRetryDivisor),
+                      isRetry: true, generation: current)
+            return
         } catch {
-            finish(.failed(info, error.localizedDescription), generation: current)
+            let needsSettings: Bool = switch error as? ProviderError {
+            case .notConfigured, .unauthorized, .unavailable: true
+            default: false
+            }
+            finish(.failed(info, error.localizedDescription), needsSettings: needsSettings, generation: current)
             return
         }
         guard current == generation, !Task.isCancelled else { return }
@@ -146,8 +173,9 @@ public final class SummarySession {
         finish(.finished(info, summary), generation: current)
     }
 
-    private func finish(_ newState: State, generation current: Int) {
+    private func finish(_ newState: State, needsSettings: Bool = false, generation current: Int) {
         guard current == generation else { return }
+        failureNeedsSettings = needsSettings
         state = newState
     }
 }

@@ -55,6 +55,8 @@ public enum ProviderError: LocalizedError, Equatable, Sendable {
     case process(String)
     case unavailable(String)
     case emptyResponse
+    /// The prompt didn't fit the model's context window. The session retries with less text.
+    case contextTooLong
 
     public var errorDescription: String? {
         switch self {
@@ -67,6 +69,7 @@ public enum ProviderError: LocalizedError, Equatable, Sendable {
         case .process(let message): message
         case .unavailable(let reason): reason
         case .emptyResponse: "The model returned an empty summary — try again."
+        case .contextTooLong: "This document is too long for the selected model. Choose a provider with a larger context in Settings."
         }
     }
 }

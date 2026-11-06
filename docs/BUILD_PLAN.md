@@ -38,9 +38,10 @@
 | PA1 | SwiftPM scaffold, menu-bar shell, Makefile, bundle script, CI | strong | auto | ✅ done |
 | PA2 | Document loading + per-provider text budgets | strong | auto | ✅ done |
 | PA3 | Provider contract, prompt builder, SummarySession, cache | strong | auto | ✅ done |
-| PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ⬜ todo |
-| PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ⬜ todo |
-| PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ⬜ todo |
+| PA4 | KeyCombo + Carbon hotkey + entry points (Finder selection, Service, Open With) + `APPSTORE` flag | strong | check | ✅ done |
+| PA5 | Floating summary panel (SwiftUI in NSPanel) | strong | check | ✅ done |
+| PA6 | Apple Intelligence provider + end-to-end wiring | strong | check | ✅ done |
+| PA6.1 | Review fixes before merging phase 2 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ⬜ todo |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ⬜ todo |
 | PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
@@ -259,7 +260,7 @@ Do not redesign these mid-plan; if a step seems to require changing one, that is
   --disable-slash-commands --strict-mcp-config --system-prompt <sys> --model <m>`, document on
   stdin, cwd `/`. Never `--bare` (it ignores subscription login). Codex: `codex exec --json
   --skip-git-repo-check --sandbox read-only --ephemeral -C / [-m <m>] -`, prompt on stdin.
-- **Default shortcut ⌃⌥Space**, user-changeable.
+- **Default shortcut ⌥⇧Space**, user-changeable. *(Changed from ⌃⌥Space in PA6.1: that combo is a macOS input-source shortcut.)*
 - **Zero dependencies; Swift Testing for tests.**
 
 ---
@@ -485,6 +486,20 @@ received (temporary "Last file: …" item). Right-click a file → Quick Actions
 → Services → Files and Folders and confirm the shortcut triggers it.
 **Commit:** `pa-step-4: global hotkey, finder selection, service and open-with entry points`
 
+**Implementation notes (2026-11-06):**
+
+- **Service file types are the supported document types**, not `public.item`, so the Service
+  only appears for files PreviewAI can read.
+- **Bug fixed in PA2 code:** `.rtfd` was reported unsupported (`UTType(filenameExtension:)` only
+  resolves data types, and RTFD is a package). `DocumentLoader.kind` special-cases it; a
+  table-driven test now covers extension → kind.
+- The menu shows the shortcut as a disabled "Shortcut: ⌃⌥Space" line rather than a key
+  equivalent (a menu key equivalent would only fire while the menu is open, which is misleading).
+- Feedback is a temporary status line in the menu ("Last file: …", "Select a document in
+  Finder first", Automation-denied hint) until the panel lands in PA5/PA6.
+- Verified the APPSTORE binary contains no Finder AppleScript (`strings … | grep 'tell
+  application "Finder"'` → 0; direct build → 1).
+
 ```text
 Wire every way a file reaches the app. No summarizing yet — the panel is PA5.
 
@@ -540,6 +555,23 @@ stealing Finder's selection, uses system vibrancy, renders Markdown (bold, bulle
 is readable in light and dark mode; Esc and the hotkey close it; ⌘C copies the summary.
 **Commit:** `pa-step-5: quick-look style floating summary panel`
 
+**Implementation notes (2026-11-06):**
+
+- **Borderless panel** with its own close button instead of a titled one — a cleaner floating
+  look; Liquid Glass via `NSGlassEffectView` (corner radius 18) on macOS 26, `NSVisualEffectView`
+  `.popover` (state forced `.active`) on 14–15.
+- **Copy is ⇧⌘C**, not ⌘C, so ⌘C keeps copying a text selection. Regenerate is ⌘R.
+- **Every entry point uses a canned demo provider in this step** (in all builds, not just DEBUG
+  — `make app` is a release build). PA6 replaces it with the provider registry.
+- **Hints show in the panel** ("Select a document in Finder…", Automation denied, APPSTORE
+  hint) via a new `SummarySession.showMessage(_:)`; the menu status line is kept only for
+  "shortcut is taken".
+- **`MarkdownBlock` parser** added to Core (headings, bullets with nesting, numbered lists,
+  rules, paragraphs; tolerant of partial streams) because `AttributedString(markdown:)` only
+  renders inline styles in SwiftUI `Text`. Tested.
+- The panel is centered on the mouse's screen each time and keeps its size while the app runs;
+  persisting the size is left to PA7 settings if wanted.
+
 ```text
 Build the panel the user sees. Native first: system materials, system fonts, standard keys.
 
@@ -591,6 +623,22 @@ streams in. With it disabled, the panel shows "Apple Intelligence is turned off"
 "Open Settings" button.
 **Commit:** `pa-step-6: apple intelligence provider and end-to-end summarize flow`
 
+**Implementation notes (2026-11-06):**
+
+- **Budget comes from the model's reported `contextSize`** (back-deployed API): `(contextSize −
+  1 600 reserved tokens) × 3 chars/token`, floor 2 000 — 7 488 characters for a 4 096-token
+  window. Output is capped at 1 000 tokens for this provider so "Detailed" can't overflow.
+- **`DeltaTracker`** converts FoundationModels' cumulative snapshots to deltas and never
+  re-emits already-sent text if the model revises.
+- **`SummarySession.failureNeedsSettings`** added so "Open Settings" appears only for provider
+  problems (unavailable / not configured / key rejected), not for document errors.
+- **"Open Settings" goes to System Settings → Apple Intelligence & Siri** for now
+  (`x-apple.systempreferences:com.apple.Siri-Settings.extension`, falling back to opening System
+  Settings); PA11 points it at PreviewAI's own settings window.
+- `UnavailableProvider` stands in for providers that aren't built/configured yet.
+- **Not verified by the session that built it:** any real Apple Intelligence output — it is
+  disabled on the dev machine (the provider correctly reports `appleIntelligenceNotEnabled`).
+
 ```text
 First real provider and the full flow: entry point → panel → stream.
 
@@ -620,13 +668,43 @@ This ends phase 2: push the branch, open the PR using the PR description templat
 CI is green, then stop.
 ```
 
+### PA6.1 — Review fixes before merging phase 2 · strong · check
+
+> **Added mid-plan 2026-11-06** — an independent review of the phase 2 diff (read-only
+> subagent) found issues tests couldn't see. Fixed on the phase branch before merge.
+
+**Verify:** `make verify` green, including new tests: default shortcut is ⌥⇧Space; pasteboard
+file-reference URLs (`file:///.file/id=…`) resolve to paths; a provider context overflow retries
+once with a third of the text and then surfaces `contextTooLong` without an "Open Settings" offer.
+**Commit:** `pa-step-6.1: review fixes — shortcut clash, panel layout, finder robustness`
+
+**Implementation notes (2026-11-06):**
+
+- **Default shortcut ⌃⌥Space → ⌥⇧Space.** ⌃⌥Space is the enabled macOS "Select next source in
+  Input menu" shortcut on the dev machine, and macOS wins silently. At launch the app now checks
+  `CopySymbolicHotKeys` (Carbon-format modifiers — verified empirically) and warns in the menu
+  if the shortcut clashes with an enabled system shortcut.
+- **Context overflow** is now `ProviderError.contextTooLong`; `SummarySession` retries once at
+  a third of the budget (covers dense scripts like CJK on the on-device model, and small local
+  models later). The retry shows the normal truncation note.
+- **Panel:** glass content view gets an explicit frame + autoresizing; macOS 14/15 blur uses a
+  rounded `maskImage` (layer corner radius doesn't clip behind-window blur).
+- **Hidden main menu** (Edit → Copy / Select All, Window → Close) so ⌘C/⌘A/⌘W work in the panel.
+- **"Summarize File…"** calls `NSApp.deactivate()` afterward so Finder is frontmost again.
+- **Shortcut while the panel is open** re-targets to a newly selected file (Quick Look-like);
+  otherwise it closes.
+- **Finder script** returns a list (newline-safe), skips items that aren't files, maps -1712
+  (unanswered permission prompt) to a clear message, and never shows raw AppleScript errors.
+- **Service** reads `NSURL`s and resolves reference URLs via `EntryPoint.fileURLs(fromPasteboardObjects:)`
+  (Swift's `URL` can't hold an unresolved reference). Copy now says "Services", not "Quick Actions".
+
 ---
 
 ### PA7 — Settings and secrets · standard · auto
 
 **Verify:** `make verify` green, including tests (with `InMemoryKeyValueStore` and
 `InMemorySecretStore`) that (a) defaults are: provider appleIntelligence, length standard,
-shortcut ⌃⌥Space, Anthropic model `claude-opus-5-5`, OpenAI-compatible preset OpenAI;
+shortcut ⌥⇧Space, Anthropic model `claude-opus-5-5`, OpenAI-compatible preset OpenAI;
 (b) every setting round-trips; (c) API keys are written only to the SecretStore — a test
 asserts no stored UserDefaults value contains the key string; (d) `ProviderRegistry` builds the
 selected provider from settings.
@@ -853,7 +931,31 @@ CI is green, then stop.
 
 > `check` steps copy their Human check here when they land. Tick when done.
 
-- *(none yet)*
+- [ ] **PA4** — run `make app && open build/PreviewAI.app`; select a PDF in Finder, press
+  ⌥⇧Space → the Automation prompt appears once; after allowing, the menu shows "Last file: …"
+  (until PA6 replaces it with the panel). Right-click a file → Quick Actions / Services →
+  "Summarize with PreviewAI" exists; bind it in System Settings → Keyboard → Keyboard Shortcuts
+  → Services → Files and Folders and confirm the shortcut triggers it. (The Service may only
+  appear after the app has been launched once, or after moving it to /Applications.)
+- [ ] **PA5** — select any supported file in Finder and press ⌥⇧Space: the panel appears
+  centered on the screen with the mouse, floats over Finder without stealing its selection
+  (Finder stays frontmost), uses glass/vibrancy, and a canned demo summary streams in with
+  headings, bold, bullets and numbers rendered. Readable in light and dark mode. Esc, the ×
+  button, and pressing ⌥⇧Space again all close it; ⇧⌘C copies the summary; ⌘R regenerates;
+  the Brief/Standard/Detailed switch restarts it. Press ⌥⇧Space with Finder *not* frontmost →
+  the panel shows "Select a document in Finder…".
+  *(Since PA6 the panel shows real Apple Intelligence output instead of the demo text.)*
+- [ ] **PA6** — with Apple Intelligence **enabled** (System Settings → Apple Intelligence &
+  Siri), select a Markdown file and a PDF in Finder and press ⌥⇧Space: the panel opens
+  instantly and a real summary streams in; a long PDF shows "Summarized the first N%". With it
+  **disabled**, the panel says "Apple Intelligence is turned off…" with an "Open Settings"
+  button that opens the Apple Intelligence & Siri pane.
+- [ ] **PA6.1** — in the panel, select part of the summary and press ⌘C / ⌘A (works via the
+  hidden Edit menu); the panel has rounded corners and its content fills it (macOS 26 glass and,
+  if you have one, a macOS 14/15 Mac); after "Summarize File…", pressing ⌥⇧Space in Finder still
+  works; with the panel open, select a *different* file and press ⌥⇧Space → it summarizes the
+  new file instead of closing. Note: after each rebuild macOS may ask for the Finder permission
+  again (ad-hoc signature changes — see Landmines).
 
 ---
 
@@ -876,6 +978,11 @@ Populated from real friction, not speculation:
   `ANTHROPIC_API_KEY`. The Claude Code provider must not use it.
 - **Fixed sleeps make async tests flaky.** Under parallel Swift Testing load a 300 ms sleep
   sometimes elapsed before the stream started. Drive timing from state callbacks instead (PA3).
+- **⌃⌥Space is a macOS shortcut** (input-source switching) — it never reached the app. Check
+  `CopySymbolicHotKeys` before choosing a default (PA6.1).
+- **Swift `URL` can't hold a file-reference URL**: `URL(string: "file:///.file/id=…")` becomes
+  `com-apple-unresolvable-file-reference-url:`, and bridging from `NSURL` resolves it. Resolve
+  while still `NSURL` (PA6.1).
 - **Ad-hoc signatures change on every rebuild.** macOS keys Automation (TCC) grants and Keychain
   item access to the code signature, so after a rebuild expect the Finder permission prompt and
   a Keychain "allow" prompt again. Fixed properly by Developer ID signing (Later).
