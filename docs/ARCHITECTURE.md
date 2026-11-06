@@ -51,6 +51,7 @@ All four paths call `AppDelegate.handle(files:)`, which filters with `EntryPoint
 | `ProviderRegistry`, `UnavailableProvider` | `Core/Providers/` | Builds the selected provider; unconfigured ones explain themselves. |
 | `SSEParser`, `HTTPClient` | `Core/Net/` | Incremental SSE parsing over raw bytes; ephemeral `URLSession` wrapper; `HTTPFailure` error-body parsing. |
 | `AnthropicProvider` | `Core/Providers/` | `POST /v1/messages`, `anthropic-version: 2026-10-21`, streaming, `output_config.effort: low`, `fallbacks: "default"` for Opus/Sonnet; only `text_delta` text is shown; refusals and stream errors map to `ProviderError`. |
+| `OpenAICompatibleProvider` | `Core/Providers/` | `POST {base}/chat/completions` streaming for OpenAI / Ollama / LM Studio / custom; Bearer key only when set; `listModels()` via `GET {base}/models`; local-server connection errors say "is it running?". |
 | `SettingsStore` | `Core/Settings/` | `@Observable` settings persisted as JSON in a `KeyValueStore` (UserDefaults in the app, in-memory in tests). API keys only via `SecretStore` (Keychain), per provider / per OpenAI-compatible preset. |
 | `SummaryCache` | `Core/Session/` | In-memory LRU (20). No disk. |
 

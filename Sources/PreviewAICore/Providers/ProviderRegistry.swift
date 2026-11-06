@@ -28,6 +28,8 @@ public final class ProviderRegistry {
             AppleIntelligenceProvider()
         case .anthropic:
             AnthropicProvider(apiKey: settings.apiKey(for: .anthropic), model: settings.anthropic.model)
+        case .openAICompatible:
+            OpenAICompatibleProvider(config: settings.openAICompatible, apiKey: settings.apiKey(for: .openAICompatible))
         default:
             UnavailableProvider(id: id, reason: "\(id.displayName) isn't set up yet.")
         }

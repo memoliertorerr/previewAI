@@ -44,7 +44,7 @@
 | PA6.1 | Review fixes before merging phase 2 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 | PA7 | SettingsStore + Keychain SecretStore + provider configuration | standard | auto | ✅ done |
 | PA8 | SSE parser + Anthropic provider | standard | auto | ✅ done |
-| PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ⬜ todo |
+| PA9 | OpenAI-compatible provider (OpenAI, Ollama, LM Studio, custom) | standard | auto | ✅ done |
 | PA10 | CLI providers: Claude Code (`claude -p`) and Codex (`codex exec`) | standard | auto | ⬜ todo |
 | PA11 | Settings window + shortcut recorder + Test connection | strong | check | ⬜ todo |
 | PA12 | Polish: launch at login, error UX, idle memory, About | standard | auto | ⬜ todo |
@@ -803,6 +803,18 @@ configured model; (c) `data: {choices:[{delta:{content}}]}` chunks yield text in
 "Couldn't reach Ollama at localhost:11434 — is it running?"; (e) `listModels()` parses
 `GET {base}/models`.
 **Commit:** `pa-step-9: openai-compatible provider with openai, ollama, lm studio presets`
+
+**Implementation notes (2026-11-06):**
+
+- **No token cap is sent to OpenAI** (neither `max_tokens` nor `max_completion_tokens`): its
+  reasoning models reject `max_tokens` and count reasoning toward `max_completion_tokens`, so a
+  summary-sized cap can produce empty output. Local and custom servers get `max_tokens`.
+- **`NSAllowsLocalNetworking`** added to `Info.plist` so App Transport Security allows plain
+  HTTP to Ollama / LM Studio on localhost. (App Store-compatible; no review justification.)
+- **Model is required** (no guessed default model name — OpenAI's lineup changes and local
+  servers have whatever the user pulled). Settings (PA11) fills it from `listModels()`.
+- Custom endpoints get a 100 000-character budget; `content_filter` finish → `.refused`.
+- **Not verified by the session that built it:** real OpenAI / Ollama / LM Studio responses.
 
 ```text
 1. Core: Providers/OpenAICompatibleProvider.swift with OpenAICompatiblePreset (openAI, ollama,
