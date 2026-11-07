@@ -74,7 +74,7 @@ Requires macOS 14+ and Xcode 26+.
 ```bash
 make verify                              # build, test, bundle both variants, lint
 make app && open build/PreviewAI.app     # run it
-make dist                                # dist/PreviewAI-<version>.zip (ad-hoc signed)
+make dist                                # dist/PreviewAI-<version>-adhoc.zip (ad-hoc signed)
 ```
 
 Signing, notarization and the Mac App Store variant: [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).

@@ -34,9 +34,10 @@ verify: build test app app-appstore lint
 
 dist: app
 	mkdir -p dist
-	rm -f dist/PreviewAI-$(VERSION).zip
-	ditto -c -k --keepParent build/PreviewAI.app dist/PreviewAI-$(VERSION).zip
-	@echo "dist: dist/PreviewAI-$(VERSION).zip"
+	rm -f dist/PreviewAI-$(VERSION)-adhoc.zip
+	ditto -c -k --norsrc --noextattr --noacl --keepParent build/PreviewAI.app dist/PreviewAI-$(VERSION)-adhoc.zip
+	scripts/check-zip.sh dist/PreviewAI-$(VERSION)-adhoc.zip
+	@echo "dist: dist/PreviewAI-$(VERSION)-adhoc.zip"
 
 clean:
 	rm -rf .build build dist
