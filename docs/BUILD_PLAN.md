@@ -52,8 +52,9 @@
 | PA13 | Docs, `make dist`, distribution guide | standard | check | ✅ done |
 | PA13.1 | Review fixes before merging phase 4 *(added mid-plan 2026-11-06)* | strong | check | ✅ done |
 | PA14 | Provider-terms compliance for the CLI providers *(added 2026-11-06)* | strong | check | ✅ done |
+| PA15 | Release zip opens with any unzip tool *(added 2026-11-07)* | standard | check | ✅ done |
 
-**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1, PA10.1 and PA13.1).
+**Overall status:** v0.1 feature-complete (PA1–PA13, plus review-fix steps PA6.1, PA10.1 and PA13.1; PA14 terms compliance; PA15 release-zip fix).
 What remains is the owner's **Pending human checks** (UI, permissions, real providers) and the
 **Later** items (Developer ID release, App Store build, long-document mode, …). Sequence: foundation → first runnable (hotkey → panel → Apple
 Intelligence) → remaining providers → settings + ship.
@@ -1122,6 +1123,31 @@ descriptive labels and the Settings notices.
 
 ---
 
+### PA15 — Release zip opens with any unzip tool · standard · check
+
+**Why (added 2026-11-07):** the owner's fresh-download test of the notarized v0.1.0 zip got
+"PreviewAI is damaged". The log showed Gatekeeper error -67054 (`SecCSResourceAdded`), and the
+zip had been opened by Parallels Toolbox "Unarchive", not Archive Utility.
+
+**Verify:** `scripts/check-zip.sh dist/PreviewAI-<v>.zip --notarized` passes; the zip lists no
+`._*` entries; `make dist` passes the same check (without `--notarized`).
+
+**Implementation notes (2026-11-07):**
+
+- Cause: `ditto -c -k` stored each file's extended attributes as `._*` AppleDouble entries.
+  Apple's extractors merge them back; plain `unzip` and other tools write them as files inside
+  the bundle, so the sealed resources no longer match. Reproduced: plain `unzip` of the old zip
+  → "a sealed resource is missing or invalid".
+- `release.sh` and `make dist` now zip with `--norsrc --noextattr --noacl` and run the new
+  `scripts/check-zip.sh` (no `._*`/`__MACOSX` entries; unzip with `/usr/bin/unzip`; `codesign
+  --verify --deep --strict`; with `--notarized` also `stapler validate`, `spctl`,
+  `syspolicy_check distribution`).
+- `make dist` now writes `PreviewAI-<v>-adhoc.zip` so it can't overwrite the notarized zip.
+- The v0.1.0 zip was rebuilt from the same notarized, stapled app (no re-signing needed — the
+  bundle is byte-identical); it passes the check. Old zip kept at `.build/PreviewAI-0.1.0-old-zip.zip`.
+
+---
+
 ## Pending human checks
 
 > `check` steps copy their Human check here when they land. Tick when done.
@@ -1162,8 +1188,9 @@ descriptive labels and the Settings notices.
   PreviewAI's memory back near its idle level.
 - [ ] **PA13** — read README.md and docs/DISTRIBUTION.md for accuracy. ✅ Done 2026-11-06:
   `scripts/release.sh` signed + notarized v0.1.0 (`dist/PreviewAI-0.1.0.zip`, verified with
-  `stapler validate` and `spctl`). Still to do: confirm it opens without a Gatekeeper warning on
-  another Mac, accept Anthropic's Commercial Terms (PROVIDER_TERMS.md → Owner actions), and decide
+  `stapler validate` and `spctl`). The first zip opened as "damaged" via a third-party unzipper
+  (see Landmines); re-zipped 2026-11-07 without extended attributes from the same notarized app.
+  Still to do: confirm the new zip opens without a Gatekeeper warning (fresh download), accept Anthropic's Commercial Terms (PROVIDER_TERMS.md → Owner actions), and decide
   whether to publish a GitHub Release (the agent doesn't publish releases).
 - [ ] **PA8–PA10 (providers)** — in Settings → Providers, use Test Connection and then a real
   summary for each provider you use: Anthropic key → summary streams
@@ -1189,6 +1216,11 @@ descriptive labels and the Settings notices.
 
 Populated from real friction, not speculation:
 
+- **Zips must not carry extended attributes.** `ditto -c -k` stores them as `._*` entries;
+  Apple's unzip merges them back, but third-party extractors (Parallels Toolbox "Unarchive" hit
+  this on 2026-11-07) write them as real files inside the bundle → "PreviewAI is damaged".
+  Zip with `--norsrc --noextattr --noacl`; `scripts/check-zip.sh` unzips with plain `unzip` and
+  re-verifies the signature (PA15).
 - **Apple Intelligence is disabled on the dev machine** (`appleIntelligenceNotEnabled`, checked
   2026-11-06). The provider can be compiled and unit-tested for budgets/mapping only; its output
   is an owner check.

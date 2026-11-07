@@ -33,6 +33,7 @@ Resources/Info.plist          app bundle Info.plist (LSUIElement, Apple Events u
 Resources/*.entitlements      Developer ID (Apple Events) and future App Store (sandbox) entitlements
 scripts/bundle.sh             assembles a .app from a built binary, ad-hoc signs (writes only in repo)
 scripts/release.sh            Developer ID sign + notarize + staple (needs the owner's certificate)
+scripts/check-zip.sh          proves a zip unpacks to a valid app with any unzip tool (used by dist/release)
 Sources/PreviewAICore/        all logic that can be unit-tested (no AppKit windows)
   Document/                   DocumentLoader, DocumentContent, budgets/truncation
   Prompt/                     PromptBuilder, SummaryLength
@@ -58,7 +59,7 @@ docs/PROVIDER_TERMS.md        what Anthropic/OpenAI allow for the CLI providers 
 - `make verify` — the gate. Builds debug, runs all tests, builds the release `.app` bundle, and
   lints the bundle's Info.plist. Must be green before any commit.
 - `make app` — builds `build/PreviewAI.app`. `open build/PreviewAI.app` runs it (a human does this).
-- `make dist` — zipped, ad-hoc-signed app in `dist/`. Signed releases: `scripts/release.sh` (owner only).
+- `make dist` — zipped, ad-hoc-signed app in `dist/` (`*-adhoc.zip`, checked by `scripts/check-zip.sh`). Signed releases: `scripts/release.sh` (owner only).
 - All SwiftPM invocations go through the Makefile, which pins SwiftPM's cache/config/security
   paths under `.build/` so builds write nothing outside the repo.
 

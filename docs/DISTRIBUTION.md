@@ -13,7 +13,8 @@ PreviewAI ships two ways from the same sources:
 > **What has been verified:** `scripts/release.sh` produced `dist/PreviewAI-0.1.0.zip` on
 > 2026-11-06; the app inside passes `codesign --verify --deep --strict` (Developer ID, hardened
 > runtime, secure timestamp), `xcrun stapler validate`, and `spctl` ("Notarized Developer ID").
-> `make dist` (ad-hoc) and the APPSTORE variant (no Apple Events or `Process` code) also check out.
+> On 2026-11-07 it was re-zipped without extended attributes (see step 3 below) and passed
+> `scripts/check-zip.sh --notarized`. `make dist` (ad-hoc) and the APPSTORE variant (no Apple Events or `Process` code) also check out.
 > **Not verified:** a first launch on a *different* Mac, and anything App Store.
 
 ## Direct download: Developer ID + notarization
@@ -46,7 +47,13 @@ PreviewAI ships two ways from the same sources:
    The script signs with the **hardened runtime** and `Resources/PreviewAI-DeveloperID.entitlements`.
    That file carries `com.apple.security.automation.apple-events` — without it the hardened
    runtime blocks Apple Events and the Finder-selection shortcut stops working.
-4. Upload `dist/PreviewAI-<version>.zip` to a GitHub Release.
+   It zips **without extended attributes** and finishes with `scripts/check-zip.sh --notarized`,
+   which unzips with plain `unzip` (as third-party tools do) and re-checks the signature, staple,
+   and `syspolicy_check distribution`. A zip that keeps `._*` entries opens as "damaged" when a
+   non-Apple unzipper extracts it.
+4. Upload `dist/PreviewAI-<version>.zip` to a GitHub Release. (`make dist` writes a separate
+   `PreviewAI-<version>-adhoc.zip`, so it never overwrites the notarized one; `make verify`
+   rebuilds `build/PreviewAI.app` ad-hoc, so the zip — not `build/` — is the release artifact.)
 
 Signing with a stable Developer ID also fixes the development annoyance where every rebuild
 re-asks for the Finder (Automation) permission and Keychain access: macOS ties both to the code
